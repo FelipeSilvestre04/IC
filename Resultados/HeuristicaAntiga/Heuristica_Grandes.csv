@@ -1,0 +1,221 @@
+Todos os testes foram feitos sem a possibilidade de pular peças,
+a partir da primeira peça que não for possivel posicionar o teste é finalizado.
+_________________________________________________________________________________________________________________________________________________
+VARREDURA NORMAL SIMPLES - PERCORRE O TECIDO EM APENAS UM SENTIDO, DA ESQUERDA PARA A DIREITA, POSSUINDO APENAS UM PONTO DE PREENCHIMENTO, AO POSICIONAR UMA PEÇA O PONTO VOLTA PARA O INICIO
+
+
+Varredura Normal Simples - Pequenas:
+1,62.5,5035
+2,62.4,4910
+3,57.2,4437
+4,57.9,4314
+5,57.2,4354
+6,61.1,4551
+7,59.8,4672
+8,53.3,4439
+9,63.7,4740
+10,56.4,4770
+11,63.3,5095
+
+
+Média Preenchimento = 59.5%, Desvio Padrão Preenchimento = 3.2%
+Média Tempo = 1h 17min 45s, Desvio Padrão Tempo = 0h 4min 18s
+
+Varredura Normal Simples - Mistas:
+1,58.7,2676
+2,63.0,2997
+3,57.6,3119
+4,64.8,4250
+5,61.8,3515
+6,61.4,3659
+7,66.4,4635
+8,65.2,3609
+9,63.9,4244
+10,60.8,4440
+11,66.0,5298
+12,62.9,3719
+13,61.8,3672
+
+Média Preenchimento = 62.6%, Desvio Padrão Preenchimento = 2.6%
+Média Tempo = 1h 3min 53s, Desvio Padrão Tempo = 11min 34s
+
+Varredura Normal Simples - Grandes:
+1,58.8,1384
+2,57.9,2007
+3,62.9,1809
+4,60.8,1760
+5,59.4,1406
+6,60.3,1649
+7,61.5,1234
+8,61.6,2069
+9,58.6,1705
+10,66.8,2733
+
+Média Preenchimento = 60.9%, Desvio Padrão Preenchimento = 2.5%
+Média Tempo = 29min 35s, Desvio Padrão Tempo = 6min 47s
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+VARREDURA NORMA DUPLA - PERCORRE O TECIDO EM DOIS SENTIDOS, DA ESQUERDA PARA A DIREITA E DA DIREITA PARA A ESQUERDA, POSSUINDO DOIS PONTOS DE PREENCHIMENTOS, AO POSICIONAR UMA PEÇA OS DOIS PONTOS VOLTAM PARA O INICIO
+
+Varredura Normal Dupla - Pequenas:
+1,59.8,9977
+2,63.5,11494
+3,57.4,11304
+4,55.2,10133
+5,63.1,13051
+6,59.3,11042
+7,66.3,15349
+8,60.7,11125
+9,63.1,12352
+
+Média Preenchimento = 60.9%, Desvio Padrão Preenchimento = 3.2%
+Média Tempo = 3h 15min 58s, Desvio Padrão Tempo = 0h 26min 0s
+
+Varredura Normal Dupla - Mistas:
+1,64.3,2790
+2,63.8,2334
+3,64.8,2837
+4,61.0,2961
+5,64.0,3802
+6,61.5,2721
+7,65.0,3275
+8,67.2,2968
+9,60.1,2351
+10,61.0,2748
+
+Média Preenchimento = 63.3%, Desvio Padrão Preenchimento = 2.1%
+Média Tempo = 47min 58s, Desvio Padrão Tempo = 6min 46s
+
+
+Varredura Normal Dupla - Grandes:
+1,62.7,1792
+2,58.0,1426
+3,59.7,1586
+4,66.5,1240
+5,65.5,1582
+6,65.8,1750
+7,63.8,1367
+8,64.0,1619
+9,62.6,1353
+10,59.5,1867
+
+Média Preenchimento = 62.8%, Desvio Padrão Preenchimento = 2.8%
+Média Tempo = 25min 58s, Desvio Padrão Tempo = 3min 17s
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+VARREDURA GRIDS SIMPLES - PERCORRE OS 6 GRIDS, DA ESQUERDA PARA A DIREITA, CADA UM COM UM PONTO DE PREENCHIMENTO, QUANDO UM GRID QUALQUER POSICIONAR UMA PEÇA, TODOS OS PONTOS VOLTAM PARA O COMEÇO
+
+
+Varredura Grids Simples - Pequenas:
+1,61.7,4982
+2,56.7,4569
+3,56.8,4648
+4,54.6,4383
+3,56.8,4648
+4,54.6,4383
+5,51.7,2984
+6,57.1,3714
+7,55.5,3692
+8,52.6,3482
+9,59.3,3990
+10,58.2,4180
+11,56.0,3565
+12,53.7,3348
+
+Média Preenchimento = 56.1%, Desvio Padrão Preenchimento = 2.5%
+Média Tempo = 1h 7min 20s, Desvio Padrão Tempo = 9min 28s
+
+Varredura Grids Simples - Mistas:
+1,50.7,764
+2,57.4,683
+3,61.7,874
+4,45.1,606
+5,50.7,694
+6,46.1,701
+7,53.2,650
+8,41.9,521
+9,58.4,835
+10,52.7,806
+
+Média Preenchimento = 51.8%, Desvio Padrão Preenchimento = 5.9%
+Média Tempo = 11min 53s, Desvio Padrão Tempo = 1min 42s
+
+
+Varredura Grids Simples - Grandes:
+1,50.1,364
+2,52.1,388
+3,47.4,303
+4,50.1,413
+5,42.1,388
+6,54.3,558
+7,47.9,482
+8,53.9,366
+9,54.9,381
+10,46.7,369
+
+Média Preenchimento = 49.9%, Desvio Padrão Preenchimento = 3.8%
+Média Tempo = 0h 6min 41s, Desvio Padrão Tempo = 0h 1min 7s
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+VARREDURA GRIDS SIMPLES 2 - PERCORRE OS 6 GRIDS, DA ESQUERDA PARA A DIREITA, CADA UM COM UM PONTO DE PREENCHIMENTO E O PERCORRIMENTO SÓ REINICIA QUANDO CADA PONTO POSICIONA PELO MENOS UMA PEÇA.
+
+
+Varredura Grids Simples 2  - Pequenas:
+1,52.0,978
+2,45.3,584
+3,50.2,531
+4,52.6,722
+5,45.6,593
+6,47.8,713
+7,51.5,674
+8,46.2,432
+9,50.8,452
+10,47.5,538
+
+Média Preenchimento = 49.0%, Desvio Padrão Preenchimento = 2.6%
+Média Tempo = 10min 21s, Desvio Padrão Tempo = 2min 31s
+
+Varredura Grids Simples 2 - Mistas:
+1,47.5,322
+2,44.8,274
+3,43.6,210
+4,49.3,333
+5,36.7,204
+6,44.2,274
+7,44.0,219
+8,44.8,265
+9,45.9,211
+10,35.9,282
+
+Média Preenchimento = 43.7%, Desvio Padrão Preenchimento = 4.0%
+Média Tempo = 4min 19s, Desvio Padrão Tempo = 44s
+
+Varredura Grids Simples 2 - Grandes:
+1,47.9,201
+2,49.1,170
+3,44.5,218
+4,46.1,212
+5,52.4,291
+6,35.8,201
+7,41.1,223
+8,48.7,213
+9,37.8,202
+10,44.4,232
+
+Média Preenchimento = 44.8%, Desvio Padrão Preenchimento = 5.0%
+Média Tempo = 3min 36s, Desvio Padrão Tempo = 29s
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+CONCLUSÕES:
+    - O tempo para preencher o ambiente esta totalmente relacionado ao numero de peças a serem posicionadas, que 
+por sua vez esta relacionada ao tamanho das peças, ou seja, preencher com peças pequenas implica em um maior tempo
+de preenchimento e preencher com peças grandes implica em um menor tempo. O tempo aumenta exponencialmente em relação
+ao numero de peças.
+
+    - A demora para posicionar todas as peças esta relacionado com a meneira de verificar se aquela peça cabe naquela
+posição, com o desenvolvimento de uma verificação mais eficiente o tempo diminuirá.
+
+    - O desperdicio é muito mais alto nas bordas contrarias ao inicio do sentido do preenchimento, 
+principlamente quando a borda se encontra nas fronteiras do tecido, isso garante outras duas afirmações: 
+  Com a varredura em cada grid, cada grid tera sua borda, logo o desperdicio aumentará.
+  Com a varredura dupla, a borda se encontra no meio do tecido, e possui um comportamento nao linear e suportando
+mais peças, diminuindo o desperdicio.

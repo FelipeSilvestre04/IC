@@ -1,0 +1,4 @@
+Dataset,Algoritmo,Ciclo,Tempo(s),Área(%),Peças,Fecho(%),Box(%)
+embraer_3153,GCG,1,153.06,65.61,8,85.58,95.17
+embraer_3153,GCG,2,152.17,65.61,8,85.58,95.17
+embraer_3153,GCG,3,153.00,65.61,8,85.58,95.17

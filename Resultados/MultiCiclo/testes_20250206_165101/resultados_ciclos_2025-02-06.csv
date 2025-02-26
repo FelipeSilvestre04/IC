@@ -1,0 +1,10 @@
+Dataset,Algoritmo,Ciclo,Tempo(s),Área(%),Peças,Fecho(%),Box(%)
+embraer_3153,GCG,1,164.85,65.61,8,85.58,95.17
+embraer_3153,GCG,2,21.05,64.45,7,85.46,96.80
+embraer_3153,GCG,3,0.21,12.50,2,14.45,15.66
+embraer_3153,GRASP,1,342.18,76.19,10,94.72,98.78
+embraer_3153,GRASP,2,51.87,58.05,6,85.61,91.79
+embraer_3153,GRASP,3,0.01,8.53,1,8.53,10.30
+embraer_3153,GRASP_GCG,1,261.80,75.47,8,92.78,97.87
+embraer_3153,GRASP_GCG,2,14.60,67.24,9,90.33,93.76
+embraer_3153,Random Key,1,542.67,74.83,0,94.10,99.54

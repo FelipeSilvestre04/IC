@@ -1,0 +1,6 @@
+Dataset,Algoritmo,Ciclo,Tempo(s),Área(%),Peças,Fecho(%),Box(%)
+embraer_3153,GRASP,1,16.78,68.17,8,85.78,91.63
+embraer_3153,GRASP,2,6.40,60.65,7,81.67,99.24
+embraer_3153,GRASP,3,0.03,13.78,2,20.73,28.23
+embraer_3086,GRASP,1,21.46,66.95,11,87.13,98.74
+embraer_3086,GRASP,2,0.49,59.83,6,78.58,90.48
