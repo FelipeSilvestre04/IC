@@ -1,7 +1,6 @@
 import numpy as np
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
-from geradores import Area
 import turtle
 import math
 from botao import Botao

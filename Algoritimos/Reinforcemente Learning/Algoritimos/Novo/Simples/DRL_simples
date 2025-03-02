@@ -1,0 +1,193 @@
+import sys
+import os
+
+sys.path.append(os.path.abspath("/home/fsilvestre"))
+
+from Cutting_Stock_Problem.Ambiente.Main.CSP_embraer import CSP
+from Cutting_Stock_Problem.Algoritimos.Metaheuristicas.RKGA.Main.RKGA import pre_processar_NFP
+
+import numpy as np
+import random
+import math
+import time
+import gymnasium as gym
+from gymnasium import spaces
+from stable_baselines3 import PPO,DQN
+from stable_baselines3.common.env_checker import check_env
+import matplotlib.pyplot as plt
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.vec_env import DummyVecEnv
+import turtle
+
+
+
+def uniformizar(lista, lista_completa):
+    pecas = []
+    tamanho = len(lista_completa)
+    max_vertices = max(len(peca) for peca in lista_completa)
+
+    for pol in lista:
+        novo_pol = pol + [(-1, -1)] * (max_vertices - len(pol))  
+        pecas.append(novo_pol)
+
+    poligono_nulo = [(-1, -1)] * max_vertices  
+
+    while len(pecas) < tamanho:  
+        pecas.append(poligono_nulo[:]) 
+
+  
+    return pecas
+
+
+
+
+class envCSP(gym.Env):
+    def __init__(self):
+
+        self.ambiente = CSP(dataset='fu', render=False, plot=True,suavizar=False,margem=0) #Ambiente que representa a area de corte, em que é possivel realizar as operações (acao e reset) e calcular o dados
+ 
+
+        self.observation_space = spaces.Dict({
+            'cutting_area': spaces.Box(low=0, high=1, shape=(self.ambiente.altura, self.ambiente.base), dtype=np.int16), #Matriz de 0 ou 1 que representa a area de corte
+            'pieces': spaces.Box(low=-1000, high=1000, shape=(len(self.ambiente.lista), 4, 2), dtype=np.int16) # Lista de pecas com o tamanho maximo como len(self.ambiente.lista), cada peca representada por uma lista de vertices, com tamanho maximo 4 pois o dataset apenas trianngulos ou quadrados, e 2 por conta das cordenadas x,y
+        })
+           
+        self.action_space = spaces.MultiDiscrete([len(self.ambiente.lista), 4, self.ambiente.base, self.ambiente.altura]) # Formato das ações: um valor N que representa o index da peça na lista de pecas, Grau que representa a rotação, x,y a coordenada na area de corte
+        
+        self.acao = 0
+        self.epoca = 0
+
+        self.recompensas_epoca = []
+        self.preenchimentos_epoca = []
+
+        
+
+
+     
+
+    def reset(self, seed=None):
+        self.epoca += 1
+        self.acao = 0
+
+        self.recompensas_epoca = []
+
+        self.ambiente.resetar() #Reset do ambiente
+
+        pecas = uniformizar(self.ambiente.nova_lista, self.ambiente.nova_lista_original) # Deixa a lista de peças com o formato padrão, com o numero maximo original de peças, e cada peça com numero maximo de vertices (4), vertices nulos = (-1,-1)
+
+        self.pecas = np.array(pecas, dtype=np.int16)
+        self.matriz = np.array(self.ambiente._matriz, dtype=np.int16)
+
+        self.estado = {
+            'cutting_area': self.matriz,
+            'pieces': self.pecas
+        }
+
+        
+        return self.estado, {}
+
+    def step(self, action):
+        
+        self.acao += 1
+        n,grau_idx,x,y = action
+
+        if n < len(self.ambiente.lista): # Se o index representa uma peça da lista
+            tam = len(self.ambiente.lista)
+            self.ambiente.acao(n,x,y,grau_idx)
+            if tam > len(self.ambiente.lista): #Se foi possivel posicionar a peça
+                self.recompensa = 1
+            else: #Se nao foi possivel posicionar a peça
+                self.recompensa = -1
+
+        else: # Se o index nao representa uma peça
+            self.recompensa = -10
+
+        self.recompensas_epoca.append(self.recompensa)
+
+        if len(self.ambiente.pecas_posicionadas) == (self.ambiente.max_pecas) or (self.acao == self.ambiente.max_pecas): #Acaba se colocou todas as peças ou se executou o numero maximo de ações por epoca (No momento esse valor é o numero maximo de pecas, como se fosse uma ação por peça)
+            self.done = True
+            preenchimento = self.ambiente.area_ocupada/self.ambiente.area
+            print(f"P: {len(self.ambiente.pecas_posicionadas)}/{self.ambiente.max_pecas}, %: {round(preenchimento*100,2)}, R: {self.recompensas_epoca}")
+        else:
+            self.done = False
+
+        pecas = uniformizar(self.ambiente.nova_lista, self.ambiente.nova_lista_original)
+
+        self.pecas = np.array(pecas, dtype=np.int16)
+        self.matriz = np.array(self.ambiente._matriz, dtype=np.int16)
+
+        self.estado = {
+            'cutting_area': self.matriz,
+            'pieces': self.pecas
+        }
+
+       
+        return self.estado, float(self.recompensa), self.done, False, {}
+    
+    def seed(self, seed=None):
+        self.np_random, seed = gym.utils.seeding.np_random(seed)
+        return [seed]
+    
+    
+def make_env(env_class, rank, seed=0):
+    def _init():
+        env = env_class()
+        env.seed(seed + rank)
+        return env
+    return _init
+
+def linear_schedule(initial_value, final):
+    def func(progress):
+        if initial_value * (progress) <= final:
+            return final
+        else:
+            return initial_value * (progress)
+    return func
+
+if __name__ == '__main__':
+    env = envCSP
+    
+    num_envs = 16
+
+
+    envs = DummyVecEnv([make_env(env, i) for i in range(num_envs)])
+
+
+    log_dir = "./ppo_csp_tensor/"
+
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    policy_kwargs = dict(
+        net_arch=dict(pi=[128, 128], vf=[128, 128]),
+    )
+
+    model = PPO('MultiInputPolicy', envs, verbose=1, tensorboard_log=log_dir,
+                n_steps=600,  
+                batch_size=120,  
+                n_epochs=30,  
+                gamma=0.99,  
+                learning_rate=linear_schedule(4e-4, 1.5e-4))
+                #learning_rate=3e-4,
+                #policy_kwargs=policy_kwargs,
+                #ent_coef=0.01,
+                #clip_range=linear_schedule(0.4, 0.2))
+
+
+  
+    model.learn(total_timesteps=1_000_000)
+    import os
+    from datetime import datetime
+
+    caminho_base = "/home/fsilvestre/Cutting_Stock_Problem"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    caminho_para_salvar = f"{caminho_base}_{timestamp}.zip"
+    os.makedirs(os.path.dirname(caminho_para_salvar), exist_ok=True)
+    model.save(caminho_para_salvar)
+
+
+    
+
+  
+
+

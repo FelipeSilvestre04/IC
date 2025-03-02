@@ -1,12 +1,12 @@
 import numpy as np
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
-from geradores import Area
+
 import turtle
 import math
 from scipy.spatial import ConvexHull
 #import pyautogui
-from botao import Botao
+from Cutting_Stock_Problem.Ambiente.Main.botao import Botao
 
 class CSP():
     def __init__(self,dataset='fu',Base=None,Altura=None,Escala=None,render=False,plot=True, x=-200, y=200):

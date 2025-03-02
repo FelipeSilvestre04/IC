@@ -1,18 +1,20 @@
 import sys
 import os
 
-# Adiciona o diretório raiz do projeto ao sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+sys.path.append(os.path.abspath("/home/fsilvestre"))
 from Cutting_Stock_Problem.Ambiente.Main.CSP_embraer import CSP, ler_poligonos, suavizar_poligono, tratar_lista, ajustar_poligono
 from Cutting_Stock_Problem.Algoritimos.Heuristicas.GCG.Main.GCG_embraer import GCG
 from Cutting_Stock_Problem.Algoritimos.Metaheuristicas.GRASP.Main.GRASP_GCG_embraer import GRASP_GCG, area_fecho_retangular, porcentagem_area
 from Cutting_Stock_Problem.Algoritimos.Metaheuristicas.GRASP.Main.GRASP_GCG_embraer import PackS_GG
 from Cutting_Stock_Problem.Algoritimos.Metaheuristicas.GRASP.Main.GRASP_embraer import GRASP, calcular_fecho_area, calcular_area_preenchida
 from Cutting_Stock_Problem.Algoritimos.Metaheuristicas.GRASP.Main.GRASP_embraer import PackS_G
-from Cutting_Stock_Problem.Algoritimos.Metaheuristicas.RKGA.Main.Random_Key_embraer import random_key_genetic, pre_processar_NFP
+from Cutting_Stock_Problem.Algoritimos.Metaheuristicas.RKGA.Main.RKGA import RKGA, pre_processar_NFP
+
+from Cutting_Stock_Problem.Algoritimos.Metaheuristicas.BRKGA.Main.BRKGA import BRKGA
+from Cutting_Stock_Problem.Algoritimos.Heuristicas.GreedyIniSol.Main.GreedyInisol import GreedyInisol
+from Cutting_Stock_Problem.Algoritimos.Heuristicas.GreedySearch.Main.GreedySearch import GreedySearch
+
 from datetime import datetime, date
-import os
 import time
 import copy
 import csv
@@ -30,7 +32,7 @@ def escrever_poligonos(poligonos, arquivo_saida):
         for i, poligono in enumerate(poligonos):
             f.write(f"{len(poligono)}\n")
             for x, y in poligono:
-                f.write(f"{x} {y}\n")
+                f.write(f"{int(x)} {int(y)}\n")
             if i != len(poligonos) - 1:
                 f.write("\n")
 
@@ -65,14 +67,14 @@ def configurar_teste():
         except ValueError:
             print("Por favor, digite um número válido.")
     
-    # Para cada dimensão, o usuário informa a porcentagem (por exemplo, 50 para 50%)
+    # Para cada dimensão, o usuário informa a porcentagem (ex: 50 para 50%)
     dimensoes_selecionadas = []
     for i in range(num_dimensoes):
         while True:
             dim = input(f"Digite a {i+1}ª dimensão (em porcentagem, sem o símbolo %): ")
             try:
                 valor = float(dim)
-                if valor > 0:  # opcional: pode limitar se desejar, por exemplo, até 100
+                if valor > 0:
                     dimensoes_selecionadas.append(valor)
                     break
                 else:
@@ -87,9 +89,14 @@ def configurar_teste():
     algoritmos['GRASP'] = int(input("GRASP (0/1): "))
     algoritmos['GRASP_GCG'] = int(input("GRASP_GCG (0/1): "))
     algoritmos['Random_Key'] = int(input("Random Key (0/1): "))
+    # Novos algoritmos
+    algoritmos['BRKGA'] = int(input("BRKGA (0/1): "))
+    algoritmos['GreedyInisol'] = int(input("GreedyInisol (0/1): "))
+    algoritmos['GreedySearch'] = int(input("GreedySearch (0/1): "))
     
     num_execucoes = 1
-    if algoritmos['GRASP'] or algoritmos['GRASP_GCG'] or algoritmos['Random_Key']:
+    # Considera algoritmos iterativos
+    if (algoritmos['GRASP'] or algoritmos['GRASP_GCG'] or algoritmos['Random_Key'] or algoritmos['BRKGA']):
         while True:
             try:
                 num_execucoes = int(input("\nNúmero de execuções para algoritmos iterativos: "))
@@ -107,26 +114,12 @@ def configurar_teste():
 
 def calcular_dimensoes_area(poligonos, dimensoes_percentuais, proporcao_base_altura=1.5):
     """
-    Para cada valor percentual informado (por exemplo, 50, 60, etc),
-    calcula as dimensões (base e altura) necessárias para que a área total dos polígonos
-    seja igual à área desejada:
-    
-        área_desejada = área_total / (percentual/100)
-    
-    Usa a relacao:
-        altura = sqrt( área_desejada / proporcao_base_altura )
-        base   = altura * proporcao_base_altura
-
-    Em seguida, a função verifica se a dimensão calculada comporta a peça de maior delta x e delta y.
-    Se não comportar, a dimensão é escalada até que ambas as condições sejam satisfeitas e o percentual
-    é corrigido de acordo.
-    
-    Retorna uma lista com itens do formato: [percentual_corrigido, base, altura]
+    Para cada valor percentual informado, calcula as dimensões necessárias para que a área total dos polígonos
+    seja igual à área desejada. Ajusta se as dimensões não comportam a maior peça.
+    Retorna uma lista com itens do formato: [base, altura, percentual_corrigido]
     """
-    # Calcula a área total dos polígonos
     area_total = sum(calcular_area(poligono) for poligono in poligonos)
     
-    # Determina o maior delta x e delta y entre as peças
     max_dx = 0
     max_dy = 0
     for poligono in poligonos:
@@ -147,42 +140,29 @@ def calcular_dimensoes_area(poligonos, dimensoes_percentuais, proporcao_base_alt
         return round(base, 2), round(altura, 2)
     
     for perc in dimensoes_percentuais:
-        # Área desejada para o percentual informado
         area_desejada = area_total / (perc / 100.0)
         base, altura = calcular_dimensoes(area_desejada)
         
-        # Guarda os valores originais calculados
         base_original, altura_original = base, altura
         perc_original = perc
         
-        # Verifica se a dimensão calculada comporta a maior peça
         if base < max_dx or altura < max_dy:
-            # Calcula o fator de escala necessário para que base >= max_dx e altura >= max_dy
             fator = max(max_dx / base if base > 0 else 1, max_dy / altura if altura > 0 else 1)
             base *= fator
             altura *= fator
-
             base += 5
             altura += 5
-
             base = int(base)
             altura = int(altura)
-            # Nova área para essas dimensões
             nova_area = base * altura
-            # Recalcula o percentual alcançado: 
-            # percentual_corrigido = (área_total / nova_area) * 100
-            perc = area_total / nova_area * 100.0
-
-            perc = int(perc)
+            perc = int(area_total / nova_area * 100.0)
             print(f"Aviso: A dimensão calculada para {perc_original}% (Base={base_original}, Altura={altura_original})")
             print(f"não comporta a maior peça (max_dx={max_dx}, max_dy={max_dy}).")
             print(f"Nova dimensão ajustada: Base={base}, Altura={altura}, com percentual corrigido de {perc}%.\n")
         
-        dimensoes_calculadas.append([int(base), int(altura),perc])
+        dimensoes_calculadas.append([int(base), int(altura), perc])
     
     return dimensoes_calculadas
-
-
 
 def save_algorithm_results(algorithm_name, results, tempos, areas, pecas, fechos, boxes, solucoes, num_execucoes, results_file, env):
     with open(results_file, "a", encoding='utf-8') as file:
@@ -221,12 +201,11 @@ def save_algorithm_results(algorithm_name, results, tempos, areas, pecas, fechos
         
         file.write("-"*190 + "\n\n")
 
-def save_cycle_results(algorithm_name, dataset, cycle_num, tempo, area, pecas, fecho, box, folder,pecas_posicionadas):
+def save_cycle_results(algorithm_name, dataset, cycle_num, tempo, area, pecas, fecho, box, folder, pecas_posicionadas):
     today = date.today().strftime("%Y-%m-%d")
     txt_file = os.path.join(folder, f"resultados_ciclos_{today}.txt")
     csv_file = os.path.join(folder, f"resultados_ciclos_{today}.csv")
     
-    # Escrita no TXT (mantém o formato com espaçamentos e linhas de separacao)
     with open(txt_file, "a", encoding='utf-8') as file:
         if cycle_num == 1:
             file.write("-"*100 + "\n")
@@ -238,7 +217,6 @@ def save_cycle_results(algorithm_name, dataset, cycle_num, tempo, area, pecas, f
             cycle_num, tempo, area, pecas, fecho, box))
         file.write(f" Solução: {pecas_posicionadas}\n")
     
-    # Escrita no CSV
     csv_header = ["Dataset", "Algoritmo", "Ciclo", "Tempo(s)", "Área(%)", "Peças", "Fecho(%)", "Box(%)"]
     file_exists = os.path.isfile(csv_file)
     
@@ -306,6 +284,28 @@ def save_um_ciclo_summary(dataset, dimension, results, filename):
             writer.writeheader()
         writer.writerow(row)
 
+def juntar_datasets(datasets):
+    name = ''.join(datasets)
+    output = []
+    lista_final = []
+    for dataset in datasets:
+        
+       
+        output.append(ler_poligonos('/home/fsilvestre/Cutting_Stock_Problem/Datasets/Embraer/' + dataset +'.dat'))
+
+    for lista in output:
+        for pol in lista:
+            lista_final.append(pol)
+
+    tamanho = len(lista_final)
+
+    escrever_poligonos(lista_final, '/home/fsilvestre/Cutting_Stock_Problem/Datasets/Embraer/' + name + '.dat')
+
+    return name
+
+
+
+
 if __name__ == "__main__":
     # Cria a pasta de teste e obtém seu nome
     pasta_teste = criar_pasta_teste()
@@ -318,28 +318,37 @@ if __name__ == "__main__":
     um_ciclo = uc == 1
     mc = int(input("\nMulti-ciclo?(0/1) "))
     multi_ciclo = mc == 1
-    if multi_ciclo:
-        separados = int(input("\nDatasets separados ou juntos? (0/1)"))
-        separados = separados == 0
+
+    separados = int(input("\nDatasets separados ou juntos? (0/1)"))
+    separados = separados == 0
     fr = 1
 
     current_time = datetime.now()
 
-    if separados:
-        instancias = ['embraer_55', 'embraer_610', 'embraer_2338', 'embraer_3274',
-                    'embraer_3089', 'embraer_3086', 'embraer_3153']
-    else:
-        instancias = ['embraer_juntos']
+    instancias = ['embraer_55', 'embraer_610', 'embraer_2338', 'embraer_3274',
+                      'embraer_3089', 'embraer_3086', 'embraer_3153']
+    if not separados:
+        datasets = []
+        for ins in instancias:
+            tag = int(input(f"Adicionar {ins}? (0/1)\n"))
+            if tag == 1:
+                datasets.append(ins)
+
+        name = juntar_datasets(datasets)
+        instancias = [name]
+        
+        print(instancias)
+
     
     rotacoes = [0, 1, 2, 3]
-    vizinhanca = 15
+    vizinhanca = 25
     q1 = 50
     q2 = 20
     q3 = 30
     pecas_inisol = 0
-    max_iter = 10
+    max_iter = 20
 
-    pop = 30
+    pop = 40
     gen = 20
 
     um_ciclo_csv = os.path.join(pasta_teste, f"um_ciclo_summary_{date.today().strftime('%Y-%m-%d')}.csv")
@@ -349,8 +358,6 @@ if __name__ == "__main__":
         env = CSP(instancia, plot=False, render=False)
         dimensoes = calcular_dimensoes_area(env.nova_lista, config['dimensoes'])
         
-
-
         with open(results_file, "a", encoding='utf-8') as file:
             file.write("\n" + "|"*190 + "\n")
             file.write(f"Instância: {instancia}\n")
@@ -383,7 +390,7 @@ if __name__ == "__main__":
             if config['algoritmos']['GCG']:
                 if um_ciclo:
                     Stime = time.time()
-                    pecas_GCG, area = GCG(tabela_nfps, instancia, plot=False, render=False, 
+                    pecas_GCG, area, lista_ciclos = GCG(tabela_nfps, instancia, plot=False, render=False, 
                                            base=dimensao[0], altura=dimensao[1], margem=margem)
                     Etime = time.time()
                     tempo_GCG = round(Etime - Stime, 2)
@@ -421,7 +428,6 @@ if __name__ == "__main__":
                     print(resultado_GCG)
                 
                 if multi_ciclo:
-                    # Escala a dimensão
                     dimensao[0] *= fr
                     dimensao[1] *= fr
                     arquivo_ciclo = os.path.join(pasta_teste, f"{instancia}_novo_ciclo_gcg.dat")
@@ -429,13 +435,11 @@ if __name__ == "__main__":
                         pass
                     
                     ciclo_count = 1
-                    # Copia a lista de peças pendentes (NFPs) para iniciar os ciclos
                     lista_ciclos = copy.deepcopy(env.nova_lista)
                     
-                    # Primeiro ciclo
                     Stime = time.time()
                     pecas_GCG, area, lista_ciclos = GCG(tabela_nfps, instancia, plot=False, render=False, 
-                                                    base=int(dimensao[0]), altura=int(dimensao[1]), margem=margem)
+                                                        base=int(dimensao[0]), altura=int(dimensao[1]), margem=margem)
                     Etime = time.time()
                     tempo_GCG = round(Etime - Stime, 2)
                     area_percent = round(area * 100, 2)
@@ -455,13 +459,12 @@ if __name__ == "__main__":
                         pecas_GCG
                     )
                     
-                    # Enquanto houver peças pendentes, repete
                     while len(lista_ciclos) > 0:
                         ciclo_count += 1
                         escrever_poligonos(lista_ciclos, arquivo_ciclo)
                         Stime = time.time()
                         pecas_GCG, area, lista_ciclos = GCG(tabela_nfps, arquivo_ciclo, plot=False, render=False, 
-                                                        base=int(dimensao[0]), altura=int(dimensao[1]), margem=margem, suavizar=False)
+                                                            base=int(dimensao[0]), altura=int(dimensao[1]), margem=margem, suavizar=False)
                         Etime = time.time()
                         tempo_GCG = round(Etime - Stime, 2)
                         area_percent = round(area * 100, 2)
@@ -480,9 +483,9 @@ if __name__ == "__main__":
                             pasta_teste,
                             pecas_GCG
                         )
-                    # Restaura as dimensões originais
                     dimensao[0] /= fr
                     dimensao[1] /= fr
+            
             # GRASP
             if config['algoritmos']['GRASP']:
                 if um_ciclo:
@@ -543,8 +546,8 @@ if __name__ == "__main__":
                     }
                 
                 if multi_ciclo:
-                    dimensao[0]*= fr
-                    dimensao[1]*= fr
+                    dimensao[0] *= fr
+                    dimensao[1] *= fr
                     instancia_ciclo = f"{instancia}_novo_ciclo_g"
                     arquivo_ciclo = os.path.join(pasta_teste, f"{instancia}_novo_ciclo_g.dat")
                     with open(arquivo_ciclo, 'w') as arquivo:
@@ -606,8 +609,9 @@ if __name__ == "__main__":
                         )
                         
                                                   
-                    dimensao[0]/= fr
-                    dimensao[1]/= fr
+                    dimensao[0] /= fr
+                    dimensao[1] /= fr
+            
             # GRASP_GCG
             if config['algoritmos']['GRASP_GCG']:
                 if um_ciclo:
@@ -621,7 +625,7 @@ if __name__ == "__main__":
 
                     for i in range(config['num_execucoes']):
                         Stime = time.time()
-                        I1, pecas_GG = GRASP_GCG(max_iter, vizinhanca, q1, q2, q3, rotacoes,
+                        I1, pecas_GG,_ = GRASP_GCG(max_iter, vizinhanca, q1, q2, q3, rotacoes,
                                                 pecas_inisol, instancia, tabela_nfps, 
                                                 base=dimensao[0], altura=dimensao[1])
                         Etime = time.time()
@@ -677,7 +681,6 @@ if __name__ == "__main__":
                     ciclo_count = 1
                     lista_ciclos_gg = copy.deepcopy(env.nova_lista)
                     
-                    # Primeiro ciclo
                     Stime = time.time()
                     I1, pecas_GG, lista_ciclos_gg = GRASP_GCG(max_iter, vizinhanca, q1, q2, q3, rotacoes,
                                                             pecas_inisol, instancia, tabela_nfps, 
@@ -701,7 +704,6 @@ if __name__ == "__main__":
                         pecas_GG
                     )
                     
-                    # Ciclos seguintes
                     while len(lista_ciclos_gg) > 0:
                         ciclo_count += 1
                         escrever_poligonos(lista_ciclos_gg, arquivo_ciclo)
@@ -729,6 +731,7 @@ if __name__ == "__main__":
                         )
                     dimensao[0] /= fr
                     dimensao[1] /= fr
+            
             # Random Key
             if config['algoritmos']['Random_Key']:
                 if um_ciclo:
@@ -742,7 +745,7 @@ if __name__ == "__main__":
 
                     for i in range(config['num_execucoes']):
                         Stime = time.time()
-                        solucao = random_key_genetic(ambiente=env, rotacoes=rotacoes,
+                        solucao, lista_ciclos = RKGA(ambiente=env, rotacoes=rotacoes,
                                                      pop_size=pop, n_generations=gen,
                                                      tabela_nfps=tabela_nfps,
                                                      base=dimensao[0], altura=dimensao[1])
@@ -808,9 +811,8 @@ if __name__ == "__main__":
                     ciclo_count = 1
                     lista_ciclos_rk = copy.deepcopy(env.nova_lista)
                     
-                    # Primeiro ciclo
                     Stime = time.time()
-                    solucao, lista_ciclos_rk = random_key_genetic(ambiente=env, rotacoes=rotacoes,
+                    solucao, lista_ciclos_rk = RKGA(ambiente=env, rotacoes=rotacoes,
                                                                 pop_size=pop, n_generations=gen,
                                                                 tabela_nfps=tabela_nfps,
                                                                 base=int(dimensao[0]), altura=int(dimensao[1]))
@@ -843,8 +845,6 @@ if __name__ == "__main__":
                         ambiente.pecas_posicionadas
                     )
                     
-                    # Ciclos seguintes
-                    
                     while len(lista_ciclos_rk) > 0:
                         
                         ciclo_count += 1
@@ -852,7 +852,7 @@ if __name__ == "__main__":
                         env_temp = CSP(arquivo_ciclo, plot=False, render=False, Base=int(dimensao[0]*fr), Altura=int(dimensao[1]*fr),suavizar=False)
 
                         Stime = time.time()
-                        solucao, lista_ciclos_rk = random_key_genetic(ambiente=env_temp, rotacoes=rotacoes,
+                        solucao, lista_ciclos_rk = RKGA(ambiente=env_temp, rotacoes=rotacoes,
                                                                     pop_size=pop, n_generations=gen,
                                                                     tabela_nfps=tabela_nfps,
                                                                     base=int(dimensao[0]), altura=int(dimensao[1]), suavizar=False)
@@ -886,12 +886,333 @@ if __name__ == "__main__":
                         )
                     dimensao[0] /= fr
                     dimensao[1] /= fr
+
+            # BRKGA (saída igual ao RKGA)
+            if config['algoritmos']['BRKGA']:
+                if um_ciclo:
+                    resultados_BRKGA = []
+                    tempos_BRKGA = []
+                    areas_BRKGA = []
+                    pecas_BRKGA = []
+                    fechos_BRKGA = []
+                    boxes_BRKGA = []
+                    solucoes_BRKGA = []
+                    for i in range(config['num_execucoes']):
+                        Stime = time.time()
+                        solucao, lista_ciclos = BRKGA(ambiente=env, rotacoes=rotacoes,
+                                        pop_size=pop, n_generations=gen,
+                                        tabela_nfps=tabela_nfps,
+                                        base=dimensao[0], altura=dimensao[1])
+                        Etime = time.time()
+                        tempo_BRKGA = round(Etime - Stime, 2)
+                        ambiente = CSP(dataset=instancia, render=False, plot=False,
+                                       Base=dimensao[0], Altura=dimensao[1])
+                        x, y = ambiente.cordenadas_area[3]
+                        index = ambiente.lista.index(solucao[0][-1])
+                        ambiente.acao(index, x, y, 0, False)
+                        for peca in solucao[1:]:
+                            if peca[-1] in ambiente.lista:
+                                ambiente.acao(peca[0], peca[1], peca[2], peca[3], peca[4], True)
+                        area_calc = round((ambiente.area_ocupada/ambiente.area)*100, 2)
+                        fecho_calc = round(calcular_fecho_area(ambiente.pecas_posicionadas)/env.area*100, 2)
+                        box_calc = round(area_fecho_retangular(ambiente.pecas_posicionadas)/env.area*100, 2)
+                        resultado = (
+                            f"BRKGA Execução {i+1}: Tempo: {tempo_BRKGA}s, Area: {area_calc}%, "
+                            f"Peças: {len(ambiente.pecas_posicionadas)}/{env.max_pecas}, "
+                            f"Fecho: {fecho_calc}%, Box: {box_calc}%"
+                        )
+                        resultados_BRKGA.append(resultado)
+                        tempos_BRKGA.append(tempo_BRKGA)
+                        areas_BRKGA.append(area_calc)
+                        pecas_BRKGA.append(len(ambiente.pecas_posicionadas))
+                        fechos_BRKGA.append(fecho_calc)
+                        boxes_BRKGA.append(box_calc)
+                        solucoes_BRKGA.append(ambiente.pecas_posicionadas)
+                        print(resultado)
+                    
+                    save_algorithm_results(
+                        'BRKGA',
+                        resultados_BRKGA,
+                        tempos_BRKGA,
+                        areas_BRKGA,
+                        pecas_BRKGA,
+                        fechos_BRKGA,
+                        boxes_BRKGA,
+                        solucoes_BRKGA,
+                        config['num_execucoes'],
+                        results_file,
+                        env
+                    )
+                    dimension_results['BRKGA'] = {
+                        'tempos': tempos_BRKGA,
+                        'areas': areas_BRKGA,
+                        'pecas': pecas_BRKGA,
+                        'fechos': fechos_BRKGA,
+                        'boxes': boxes_BRKGA
+                    }
+                if multi_ciclo:
+                    dimensao[0] *= fr
+                    dimensao[1] *= fr
+                    arquivo_ciclo = os.path.join(pasta_teste, f"{instancia}_novo_ciclo_brkga.dat")
+                    with open(arquivo_ciclo, 'w') as arquivo:
+                        pass
+                    ciclo_count = 1
+                    lista_ciclos_brkga = copy.deepcopy(env.nova_lista)
+                    Stime = time.time()
+                    solucao, lista_ciclos_brkga = BRKGA(ambiente=env, rotacoes=rotacoes,
+                                                        pop_size=pop, n_generations=gen,
+                                                        tabela_nfps=tabela_nfps,
+                                                        base=int(dimensao[0]), altura=int(dimensao[1]))
+                    Etime = time.time()
+                    tempo_BRKGA = round(Etime - Stime, 2)
+                    ambiente = CSP(dataset=instancia, render=False, plot=False,
+                                   Base=int(dimensao[0]), Altura=int(dimensao[1]))
+                    x, y = ambiente.cordenadas_area[3]
+                    index = ambiente.lista.index(solucao[0][-1])
+                    ambiente.acao(index, x, y, 0, False)
+                    for peca in solucao[1:]:
+                        if peca[-1] in ambiente.lista:
+                            ambiente.acao(peca[0], peca[1], peca[2], peca[3], peca[4], True)
+                    area_calc = round((ambiente.area_ocupada/ambiente.area)*100, 2)
+                    fecho_calc = round(calcular_fecho_area(ambiente.pecas_posicionadas)/env.area*100, 2)
+                    box_calc = round(area_fecho_retangular(ambiente.pecas_posicionadas)/env.area*100, 2)
+                    save_cycle_results(
+                        'BRKGA',
+                        instancia,
+                        ciclo_count,
+                        tempo_BRKGA,
+                        area_calc,
+                        len(ambiente.pecas_posicionadas),
+                        fecho_calc,
+                        box_calc,
+                        pasta_teste,
+                        ambiente.pecas_posicionadas
+                    )
+                    while len(lista_ciclos_brkga) > 0:
+                        ciclo_count += 1
+                        escrever_poligonos(lista_ciclos_brkga, arquivo_ciclo)
+                        env_temp = CSP(arquivo_ciclo, plot=False, render=False, Base=int(dimensao[0]*fr), Altura=int(dimensao[1]*fr),suavizar=False)
+
+                        Stime = time.time()
+                        solucao, lista_ciclos_brkga = BRKGA(ambiente=env_temp, rotacoes=rotacoes,
+                                                            pop_size=pop, n_generations=gen,
+                                                            tabela_nfps=tabela_nfps,
+                                                            base=int(dimensao[0]), altura=int(dimensao[1]), suavizar=False)
+                        Etime = time.time()
+                        tempo_BRKGA = round(Etime - Stime, 2)
+                        ambiente = CSP(dataset=arquivo_ciclo, render=False, plot=False,
+                                       Base=dimensao[0], Altura=dimensao[1],suavizar=False)
+                        x, y = ambiente.cordenadas_area[3]
+                        index = ambiente.lista.index(solucao[0][-1])
+                        ambiente.acao(index, x, y, 0, False)
+                        for peca in solucao[1:]:
+                            if peca[-1] in ambiente.lista:
+                                ambiente.acao(peca[0], peca[1], peca[2], peca[3], peca[4], True)
+                        area_calc = round((ambiente.area_ocupada/ambiente.area)*100, 2)
+                        fecho_calc = round(calcular_fecho_area(ambiente.pecas_posicionadas)/env.area*100, 2)
+                        box_calc = round(area_fecho_retangular(ambiente.pecas_posicionadas)/env.area*100, 2)
+                        save_cycle_results(
+                            'BRKGA',
+                            instancia,
+                            ciclo_count,
+                            tempo_BRKGA,
+                            area_calc,
+                            len(ambiente.pecas_posicionadas),
+                            fecho_calc,
+                            box_calc,
+                            pasta_teste,
+                            ambiente.pecas_posicionadas
+                        )
+                    dimensao[0] /= fr
+                    dimensao[1] /= fr
+            
+            # GreedyInisol (saída igual ao GCG)
+            if config['algoritmos']['GreedyInisol']:
+                if um_ciclo:
+                    Stime = time.time()
+                    pecas_GI, area, lista_ciclos = GreedyInisol(tabela_nfps, instancia, plot=False, render=False,
+                                                 base=dimensao[0], altura=dimensao[1], margem=margem)
+                    Etime = time.time()
+                    tempo_GI = round(Etime - Stime, 2)
+                    area_percent = round(area * 100, 2)
+                    fecho_percent = round(calcular_fecho_area(pecas_GI)/env.area*100, 2)
+                    box_percent = round(area_fecho_retangular(pecas_GI)/env.area*100, 2)
+                    resultado_GI = (
+                        f"GreedyInisol: Tempo: {tempo_GI}s, Area: {area_percent}%, "
+                        f"Peças: {len(pecas_GI)}/{env.max_pecas}, "
+                        f"Fecho: {fecho_percent}%, Box: {box_percent}%"
+                    )
+                    save_algorithm_results(
+                        'GreedyInisol', 
+                        [resultado_GI], 
+                        [tempo_GI], 
+                        [area_percent], 
+                        [len(pecas_GI)], 
+                        [fecho_percent], 
+                        [box_percent], 
+                        [pecas_GI], 
+                        1, 
+                        results_file, 
+                        env
+                    )
+                    dimension_results['GreedyInisol'] = {
+                        'tempos': [tempo_GI],
+                        'areas': [area_percent],
+                        'pecas': [len(pecas_GI)],
+                        'fechos': [fecho_percent],
+                        'boxes': [box_percent]
+                    }
+                    print(resultado_GI)
+                if multi_ciclo:
+                    dimensao[0] *= fr
+                    dimensao[1] *= fr
+                    arquivo_ciclo = os.path.join(pasta_teste, f"{instancia}_novo_ciclo_gi.dat")
+                    with open(arquivo_ciclo, 'w') as arquivo:
+                        pass
+                    ciclo_count = 1
+                    lista_ciclos_gi = copy.deepcopy(env.nova_lista)
+                    Stime = time.time()
+                    pecas_GI, area, lista_ciclos_gi = GreedyInisol(tabela_nfps, instancia, plot=False, render=False,
+                                                                  base=int(dimensao[0]), altura=int(dimensao[1]), margem=margem)
+                    Etime = time.time()
+                    tempo_GI = round(Etime - Stime, 2)
+                    area_percent = round(area * 100, 2)
+                    fecho_percent = round(calcular_fecho_area(pecas_GI)/env.area*100, 2)
+                    box_percent = round(area_fecho_retangular(pecas_GI)/env.area*100, 2)
+                    save_cycle_results(
+                        'GreedyInisol',
+                        instancia,
+                        ciclo_count,
+                        tempo_GI,
+                        area_percent,
+                        len(pecas_GI),
+                        fecho_percent,
+                        box_percent,
+                        pasta_teste,
+                        pecas_GI
+                    )
+                    while len(lista_ciclos_gi) > 0:
+                        ciclo_count += 1
+                        escrever_poligonos(lista_ciclos_gi, arquivo_ciclo)
+                        Stime = time.time()
+                        pecas_GI, area, lista_ciclos_gi = GreedyInisol(tabela_nfps, arquivo_ciclo, plot=False, render=False,
+                                                                      base=int(dimensao[0]), altura=int(dimensao[1]), margem=margem, suavizar=False)
+                        Etime = time.time()
+                        tempo_GI = round(Etime - Stime, 2)
+                        area_percent = round(area * 100, 2)
+                        fecho_percent = round(calcular_fecho_area(pecas_GI)/env.area*100, 2)
+                        box_percent = round(area_fecho_retangular(pecas_GI)/env.area*100, 2)
+                        save_cycle_results(
+                            'GreedyInisol',
+                            instancia,
+                            ciclo_count,
+                            tempo_GI,
+                            area_percent,
+                            len(pecas_GI),
+                            fecho_percent,
+                            box_percent,
+                            pasta_teste,
+                            pecas_GI
+                        )
+                    dimensao[0] /= fr
+                    dimensao[1] /= fr
+            
+            # GreedySearch (saída igual ao GCG)
+            if config['algoritmos']['GreedySearch']:
+                if um_ciclo:
+                    Stime = time.time()
+                    pecas_GS, area, lista_ciclos = GreedySearch(tabela_nfps, instancia, plot=False, render=False,
+                                                 base=dimensao[0], altura=dimensao[1], margem=margem)
+                    Etime = time.time()
+                    tempo_GS = round(Etime - Stime, 2)
+                    area_percent = round(area * 100, 2)
+                    fecho_percent = round(calcular_fecho_area(pecas_GS)/env.area*100, 2)
+                    box_percent = round(area_fecho_retangular(pecas_GS)/env.area*100, 2)
+                    resultado_GS = (
+                        f"GreedySearch: Tempo: {tempo_GS}s, Area: {area_percent}%, "
+                        f"Peças: {len(pecas_GS)}/{env.max_pecas}, "
+                        f"Fecho: {fecho_percent}%, Box: {box_percent}%"
+                    )
+                    save_algorithm_results(
+                        'GreedySearch', 
+                        [resultado_GS], 
+                        [tempo_GS], 
+                        [area_percent], 
+                        [len(pecas_GS)], 
+                        [fecho_percent], 
+                        [box_percent], 
+                        [pecas_GS], 
+                        1, 
+                        results_file, 
+                        env
+                    )
+                    dimension_results['GreedySearch'] = {
+                        'tempos': [tempo_GS],
+                        'areas': [area_percent],
+                        'pecas': [len(pecas_GS)],
+                        'fechos': [fecho_percent],
+                        'boxes': [box_percent]
+                    }
+                    print(resultado_GS)
+                if multi_ciclo:
+                    dimensao[0] *= fr
+                    dimensao[1] *= fr
+                    arquivo_ciclo = os.path.join(pasta_teste, f"{instancia}_novo_ciclo_gs.dat")
+                    with open(arquivo_ciclo, 'w') as arquivo:
+                        pass
+                    ciclo_count = 1
+                    lista_ciclos_gs = copy.deepcopy(env.nova_lista)
+                    Stime = time.time()
+                    pecas_GS, area, lista_ciclos_gs = GreedySearch(tabela_nfps, instancia, plot=False, render=False,
+                                                                  base=int(dimensao[0]), altura=int(dimensao[1]), margem=margem)
+                    Etime = time.time()
+                    tempo_GS = round(Etime - Stime, 2)
+                    area_percent = round(area * 100, 2)
+                    fecho_percent = round(calcular_fecho_area(pecas_GS)/env.area*100, 2)
+                    box_percent = round(area_fecho_retangular(pecas_GS)/env.area*100, 2)
+                    save_cycle_results(
+                        'GreedySearch',
+                        instancia,
+                        ciclo_count,
+                        tempo_GS,
+                        area_percent,
+                        len(pecas_GS),
+                        fecho_percent,
+                        box_percent,
+                        pasta_teste,
+                        pecas_GS
+                    )
+                    while len(lista_ciclos_gs) > 0:
+                        ciclo_count += 1
+                        escrever_poligonos(lista_ciclos_gs, arquivo_ciclo)
+                        Stime = time.time()
+                        pecas_GS, area, lista_ciclos_gs = GreedySearch(tabela_nfps, arquivo_ciclo, plot=False, render=False,
+                                                                      base=int(dimensao[0]), altura=int(dimensao[1]), margem=margem, suavizar=False)
+                        Etime = time.time()
+                        tempo_GS = round(Etime - Stime, 2)
+                        area_percent = round(area * 100, 2)
+                        fecho_percent = round(calcular_fecho_area(pecas_GS)/env.area*100, 2)
+                        box_percent = round(area_fecho_retangular(pecas_GS)/env.area*100, 2)
+                        save_cycle_results(
+                            'GreedySearch',
+                            instancia,
+                            ciclo_count,
+                            tempo_GS,
+                            area_percent,
+                            len(pecas_GS),
+                            fecho_percent,
+                            box_percent,
+                            pasta_teste,
+                            pecas_GS
+                        )
+                    dimensao[0] /= fr
+                    dimensao[1] /= fr
+            
             # Salvar sumário da dimensão completo (CSV)
             if dimension_results:
                 today = date.today().strftime("%Y-%m-%d")
                 summary_file = os.path.join(pasta_teste, f"summary_{today}.csv")
                 save_dimension_summary(instancia, dimensao, dimension_results, summary_file)
                 
-                # Se teste de UM ciclo, salva também o resumo em CSV (tabela simplificada)
                 if um_ciclo:
                     save_um_ciclo_summary(instancia, dimensao, dimension_results, um_ciclo_csv)

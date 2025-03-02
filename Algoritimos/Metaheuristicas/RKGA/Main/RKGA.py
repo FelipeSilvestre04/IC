@@ -1,7 +1,6 @@
 from Cutting_Stock_Problem.Ambiente.Main.CSP_embraer import CSP
 from Cutting_Stock_Problem.Ambiente.Main.CSP_embraer import calcular_area, rotate_point, ponto_dentro_poligono
-from nfp_teste import combinar_poligonos,triangulate_shapely
-from nfp_teste import no_fit_polygon
+from Cutting_Stock_Problem.Ambiente.Teste.nfp_teste import combinar_poligonos, triangulate_shapely, no_fit_polygon
 import numpy as np
 from shapely.geometry import Polygon, MultiPoint
 import turtle
@@ -663,8 +662,8 @@ def calcular_tempo_medio_desvio(tempos):
     
     return tempo_medio, desvio_padrao
 
-def random_key_genetic(ambiente, rotacoes, pop_size, n_generations, tabela_nfps,base=None, altura=None,  suavizar = True):
-    print("\nRandom Key Iniciado!")
+def RKGA(ambiente, rotacoes, pop_size, n_generations, tabela_nfps,base=None, altura=None,  suavizar = True):
+    print("\nRKGA Iniciado!")
     # População inicial
     population = [np.random.random(len(ambiente.lista)) for _ in range(pop_size)]
     best_solution = None
@@ -789,7 +788,7 @@ if __name__ == '__main__':
         start_time = time.time()
         # Executa o algoritmo
         print("Comecou")
-        solucao = random_key_genetic(
+        solucao = RKGA(
             ambiente=ambiente,
             rotacoes=rotacoes,
             pop_size=50,

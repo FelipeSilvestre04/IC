@@ -1,57 +1,46 @@
 import sys
 import os
 
-# Adiciona o diretório raiz do projeto ao sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')))
+sys.path.append(os.path.abspath("/home/fsilvestre"))
 
 from Cutting_Stock_Problem.Ambiente.Main.CSP_embraer import CSP
 from Cutting_Stock_Problem.Ambiente.Main.CSP_embraer import calcular_area, rotate_point, ponto_dentro_poligono
 from Cutting_Stock_Problem.Ambiente.Teste.nfp_teste import combinar_poligonos, triangulate_shapely, no_fit_polygon
-from Cutting_Stock_Problem.Algoritimos.Metaheuristicas.RKGA.Main.RKGA import pre_processar_NFP
 import numpy as np
 from shapely.geometry import Polygon, MultiPoint
 import turtle
+import numpy as np
 import random
+import turtle
 import copy
-from numba import njit
 
 
-
-def GRASP(mIter, x,q1,q2,q3,rotacoes,pecas_inisol, instancia,tabela_nfps,base=None, altura=None, suavizar = True):
-    print('\nGRASP iniciado!')
+def GRASP(mIter, x,q1,q2,q3,rotacoes,pecas_inisol, instancia,tabela_nfps):
     for i in range(mIter):
-        print(f'Iteração {i} GRASP.')
-        ambiente = CSP(dataset=instancia, render=False, plot=False,Base=base,Altura=altura, suavizar = suavizar)
-        I1, I2,pecasI,lista = IniSOL(ambiente,rotacoes,pecas_inisol, False, tabela_nfps,base,suavizar)
+        ambiente = CSP(dataset=instancia, render=False, plot=False)
+        I1, I2 = IniSOL(ambiente,rotacoes,pecas_inisol, False, tabela_nfps)
         if len(I1) == ambiente.max_pecas:
-            return I1,pecasI,lista
-        if len(I1) == 0:
-            return I1,pecasI,[]
-
+            return I1
         fecho = ambiente.area_ocupada/ambiente.fecho
-        I1_novo,pecas_novo,lista = LocSEARCH(I1,I2,x,q1,q2,q3,fecho, 0,instancia,tabela_nfps,base,altura,suavizar)
+        I1_novo = LocSEARCH(I1,I2,x,q1,q2,q3,fecho, 0,instancia,tabela_nfps)
         if len(I1_novo) == ambiente.max_pecas:
-            return I1_novo,pecas_novo,lista
+            return I1_novo
         
         if i == 0:
             I = copy.deepcopy(I1_novo)
-            pecas = pecas_novo
-            melhor_lista = copy.deepcopy(lista)
 
         elif porcentagem_area(I1_novo,ambiente) > porcentagem_area(I,ambiente):
             I = copy.deepcopy(I1_novo)
-            pecas = pecas_novo
-            melhor_lista = copy.deepcopy(lista)
 
 
-    return I, pecas,melhor_lista
+    return I
 
 
-def LocSEARCH(I1, I2, x_dado, q1, q2, q3,fecho, pq,instancia,tabela_nfps,Base,Altura,suavizar):
+def LocSEARCH(I1, I2, x_dado, q1, q2, q3,fecho, pq,instancia,tabela_nfps):
     melhorou_global = True
     
     while melhorou_global:
-        ambiente = CSP(dataset=instancia,render=False, plot=False,Base=Base,Altura=Altura, suavizar = suavizar)        
+        ambiente = CSP(dataset=instancia,render=True, plot=True)        
         melhorou_global = False
         area_global = porcentagem_area(I1,ambiente)
         for idk in range(0,x_dado,1):
@@ -59,20 +48,17 @@ def LocSEARCH(I1, I2, x_dado, q1, q2, q3,fecho, pq,instancia,tabela_nfps,Base,Al
             
             I1_original = copy.deepcopy(I1)
             I2_original = copy.deepcopy(I2)
-            ambiente = CSP(dataset=instancia,render=False, plot=False,Base=Base,Altura=Altura, suavizar = suavizar) 
+            ambiente = CSP(dataset=instancia,render=True, plot=False)
             if ambiente.render:
                 ambiente.turtle_dados.clear()
 
             
             
             if tipo == 'permutar':
-                I1_original = copy.deepcopy(I1)
                 I1_linha = trocar_elementos_aleatorios(I1,pq)
             elif tipo == 'trocar':
-                I1_original = copy.deepcopy(I1)
                 I1_linha, I2_linha = trocar_elementos_entre_listas(I1, I2,pq)
             elif tipo == 'adicionar':
-                I1_original = copy.deepcopy(I1)
                 I1_linha, I2_linha = adicionar_elemento(I1, I2,pq)
             
             x, y = ambiente.cordenadas_area[3]
@@ -86,20 +72,6 @@ def LocSEARCH(I1, I2, x_dado, q1, q2, q3,fecho, pq,instancia,tabela_nfps,Base,Al
             index = ambiente.lista.index(I1_linha[0][-1])
             ambiente.acao(index, x - minx, y - miny, 0, False)
 
-            if len(ambiente.pecas_posicionadas) == 0:
-                I1_linha = copy.deepcopy(I1_original)
-                x, y = ambiente.cordenadas_area[3]
-
-                minx = min([x for x,y in I1_linha[0][-1]]) 
-                miny = min([y for x,y in I1_linha[0][-1]]) 
-
-                minx*=ambiente.Escala
-                miny*=ambiente.Escala
-
-                index = ambiente.lista.index(I1_linha[0][-1])
-                ambiente.acao(index, x - minx, y - miny, 0, False)
-
-
 
             I1_novo = []
             I1_novo = [I1_linha[0]]
@@ -107,7 +79,7 @@ def LocSEARCH(I1, I2, x_dado, q1, q2, q3,fecho, pq,instancia,tabela_nfps,Base,Al
             for peca in I1_linha[1:]:
                 if peca[-1] in ambiente.lista:
                     index = ambiente.lista.index(peca[-1])
-                    peca_posicao = PackS_G(ambiente, index, rotacoes, False,tabela_nfps)
+                    peca_posicao = PackS(ambiente, index, rotacoes, False,tabela_nfps)
                     if peca_posicao is not False:
                         I1_novo.append(peca)
 
@@ -138,30 +110,26 @@ def LocSEARCH(I1, I2, x_dado, q1, q2, q3,fecho, pq,instancia,tabela_nfps,Base,Al
             
             print(f"{tipo[0]}, {'M' if melhorou else 'NM'} {area_global:.3f} - {len(I1)} - {len(I2)}, {area_nova:.3f} - {ambiente.max_pecas - len(ambiente.lista)} - {len(ambiente.lista)}")
             if len(I1) == ambiente.max_pecas:
+                if False:
+                    turtle.clear()
+                    ambiente = CSP(dataset=instancia,render=True, plot=False)
+                    x, y = ambiente.cordenadas_area[3]
+                    index = ambiente.lista.index(I1[0][-1])
+                    ambiente.acao(index, x, y, 0, False)
+                    for peca in I1[1:]:
+                        if peca[-1] in ambiente.lista:
+                            index = ambiente.lista.index(peca[-1])
+                            peca_posicao = PackS(ambiente, index, rotacoes, True)
+                            if peca_posicao is not False:
+                                ambiente.acao(peca_posicao[0], peca_posicao[1], peca_posicao[2], peca_posicao[3],peca_posicao[4],True)
+                    turtle.done
 
-                return I1,ambiente.pecas_posicionadas,ambiente.lista
+                print(f"{len(ambiente.pecas_posicionadas)}, {len(I1)}")
+                return I1
                 
         
     print(f"Iteração concluída. Tamanho de I1: {len(I1)}, Área: {area_global:.2f}")
-    ambiente = CSP(dataset=instancia,render=False, plot=False,Base=Base,Altura=Altura, suavizar = suavizar) 
-    x, y = ambiente.cordenadas_area[3]
-
-    minx = min([x for x,y in I1[0][-1]]) 
-    miny = min([y for x,y in I1[0][-1]]) 
-
-    minx*=ambiente.Escala
-    miny*=ambiente.Escala
-
-    index = ambiente.lista.index(I1[0][-1])
-    ambiente.acao(index, x - minx, y - miny, 0, False)
-
-    for peca in I1[1:]:
-        if peca[-1] in ambiente.lista:
-            index = ambiente.lista.index(peca[-1])
-            peca_posicao = PackS_G(ambiente, index, rotacoes, False,tabela_nfps)
-            if peca_posicao is not False:
-                ambiente.acao(peca_posicao[0], peca_posicao[1], peca_posicao[2], peca_posicao[3],peca_posicao[4],True)
-    return I1,ambiente.pecas_posicionadas,ambiente.lista
+    return I1
 
 import random
 from scipy.spatial import ConvexHull
@@ -200,19 +168,13 @@ def trocar_elementos_entre_listas(lista1, lista2,pq):
 
 def trocar_elementos_aleatorios(I1,pq):
     lista = I1.copy()
-    indice = round(len(lista)*pq,1)
-    if (len(I1) > 2):
-        idx1, idx2 = random.sample(range(int(indice),len(lista)-1), 2)
-        
-        # Troca os elementos nas posições idx1 e idx2
-        lista[idx1], lista[idx2] = lista[idx2], lista[idx1]
-        
-        return lista.copy()
-    elif len(I1) == 2:
-        temp = lista[0]
-        lista[0] = lista[1]
-        lista[1] = temp
-        return lista.copy()        
+    indice = round(pq * len(lista),1)
+    idx1, idx2 = random.sample(range(int(indice),len(lista)-1), 2)
+    
+    # Troca os elementos nas posições idx1 e idx2
+    lista[idx1], lista[idx2] = lista[idx2], lista[idx1]
+    
+    return lista.copy()
 
 def porcentagem_area(I1,ambiente):
     area = 0
@@ -243,55 +205,23 @@ def indices_sem_copias(lista):
 
     return indices
 
-def IniSOL(ambiente, rotacoes, pq,draw, tabela_nfps,Base,Altura):
+def IniSOL(ambiente, rotacoes, pq,draw, tabela_nfps):
     I1 = []  # Peças posicionadas
     I2 = []  # Peças não posicionadas
-    pecas_aleatorias = math.ceil(len(ambiente.lista) * 0.1) - 1
-    indexs_1 = [i for i in range(len(ambiente.lista))]
-    print(indexs_1)
-    colocou = False
-    while not colocou and indexs_1:
-        grau = 0
-        x, y = ambiente.cordenadas_area[3 - grau]
+    # Inicializa a primeira peça na coordenada inicial (x, y) do ambiente
+    grau = 0
+    x, y = ambiente.cordenadas_area[3 - grau]
 
-        index = random.randint(0, len(indexs_1) - 1)
-        index_escolhido = indexs_1[index]
-        minx = min([x for x, y in ambiente.lista[index_escolhido]])
-        miny = min([y for x, y in ambiente.lista[index_escolhido]])
 
-        minx *= ambiente.Escala
-        miny *= ambiente.Escala
+    index = random.randint(0,len(ambiente.lista) -1)
+    minx = min([x for x,y in ambiente.lista[index]]) 
+    miny = min([y for x,y in ambiente.lista[index]]) 
 
-        peca1 = [index_escolhido, x - minx, y - miny, grau, 0, ambiente.lista[index_escolhido]]
-        ambiente.acao(index_escolhido, x - minx, y - miny, grau, False)
-        if len(ambiente.pecas_posicionadas) > 0:
-            colocou = True
-        else:
-            indexs_1.remove(index_escolhido)
-            print(f"Índice {index_escolhido} removido. Tentando outro índice.")
-            # Supondo que ambiente.lista[index_escolhido] é uma lista de vértices (x, y)
-            vertices = ambiente.nova_lista[index_escolhido]
+    minx*=ambiente.Escala
+    miny*=ambiente.Escala
 
-            # Encontra os valores mínimos e máximos de x e y
-            min_x = min([x for x, y in vertices])
-            max_x = max([x for x, y in vertices])
-            min_y = min([y for x, y in vertices])
-            max_y = max([y for x, y in vertices])
-
-            # Calcula delta x e delta y
-            delta_x = max_x - min_x
-            delta_y = max_y - min_y
-            print("Area: ", ambiente.cordenadas_area)
-            print("Delta x:", delta_x)
-            print("Delta y:", delta_y)
-
-            
-            
-    if not indexs_1:
-        print("Não foi possível encontrar um índice válido.")
-
-        
-        
+    peca1 = [index,x - minx,y - miny,grau,0,ambiente.lista[index]]      
+    ambiente.acao(index, x - minx, y - miny, grau, False)
 
     
     for i in range(pq):
@@ -308,27 +238,20 @@ def IniSOL(ambiente, rotacoes, pq,draw, tabela_nfps,Base,Altura):
         
         indexs = indices_sem_copias(ambiente.lista)
         for peca in indexs:
-            peca_posicao = PackS_G(ambiente, peca, rotacoes,draw,tabela_nfps)
+            peca_posicao = PackS(ambiente, peca, rotacoes,draw,tabela_nfps)
             if peca_posicao is not False:
                 Possiveis_posicoes.append(peca_posicao)
         
         # Se houver posições possíveis para a peça, escolha a melhor
         if Possiveis_posicoes:
-            if pecas_aleatorias == 0:
-                max_valor = best_posicao(Possiveis_posicoes)[5]
-            else:
-                if random.random() < 0.5:
-                    max_valor = random.sample(Possiveis_posicoes,k=1)[0][5]
-                    pecas_aleatorias -= 1
-                else:
-                    max_valor = best_posicao(Possiveis_posicoes)[5]
-
+            print(1)
+            max_valor = best_posicao(Possiveis_posicoes)[5]
             melhores_posicoes = [p for p in Possiveis_posicoes if p[5] == max_valor]
 
             melhor_posicao = max(melhores_posicoes, key=lambda p: calcular_area(ambiente.lista[p[0]]))
             I1.append(melhor_posicao)
             if draw:
-                for i in range(1000):
+                for i in range(100):
                     ambiente.draw_click(melhor_posicao[1], -1*melhor_posicao[2], melhor_posicao[3],melhor_posicao[0], melhor_posicao[4])
             ambiente.acao(melhor_posicao[0], melhor_posicao[1], melhor_posicao[2], melhor_posicao[3], melhor_posicao[4], True)
         else:
@@ -340,7 +263,7 @@ def IniSOL(ambiente, rotacoes, pq,draw, tabela_nfps,Base,Altura):
     print("Peças posicionadas:", len(I1))
     print("Peças restantes:", len(I2))
     
-    return I1, I2, ambiente.pecas_posicionadas, ambiente.lista # Retorna a lista de peças posicionadas e as restantes
+    return I1, I2  # Retorna a lista de peças posicionadas e as restantes
 
         
         
@@ -367,7 +290,7 @@ def rotacoes_distintas(rotacoes):
 
     return indices_distintas
      
-def PackS_G(ambiente, peca, rotacoes,draw,tabela_nfps):
+def PackS(ambiente, peca, rotacoes,draw,tabela_nfps):
     nfp = []
     lista = []
     melhores_posicoes = []
@@ -378,8 +301,7 @@ def PackS_G(ambiente, peca, rotacoes,draw,tabela_nfps):
     graus = [0,90,180,270]
     pecas_rot = []
     for i in rotacoes:
-        grau = graus[i]
-        # print(grau) 
+        grau = graus[i] 
         pecas_rot.append([[(round(rotate_point(cor[0], cor[1], grau)[0], 1), round(rotate_point(cor[0], cor[1], grau)[1],1)) for cor in pol_posicionar],i])
     
     rotacoes_validas = rotacoes_distintas(pecas_rot)
@@ -394,26 +316,81 @@ def PackS_G(ambiente, peca, rotacoes,draw,tabela_nfps):
         #print(melhor)
         return melhor
     else:
-        #print(len(melhores_posicoes))
         return False
 
 
+import math
 
+from shapely.geometry import Polygon
+import numpy as np
 
-def pre_processar_NFP_GG(rotacoes, lista_pecas):
+def offset_polygon(vertices, offset):
+    """
+    Cria um novo polígono com offset a partir de um polígono original usando Shapely
+    
+    Args:
+        vertices: Lista de tuplas (x, y) representando os vértices do polígono
+        offset: Valor do offset (positivo para expandir, negativo para contrair)
+    
+    Returns:
+        Lista de tuplas (x, y) representando os vértices do novo polígono
+    """
+    if offset > 0:
+        # Cria um polígono Shapely
+        poly = Polygon(vertices)
+        
+        # Verifica se o polígono é válido
+        if not poly.is_valid:
+            return vertices
+        
+        # Aplica o buffer (offset)
+        # join_style=1 (round) para suavizar cantos
+        # mitre_limit controla quanto os cantos podem se estender
+        buffered = poly.buffer(offset, join_style=1, mitre_limit=2.0)
+        
+        # Se o resultado for vazio ou inválido, retorna o original
+        if buffered.is_empty or not buffered.is_valid:
+            return vertices
+        
+        # Extrai os vértices do polígono resultante
+        if buffered.geom_type == 'Polygon':
+            # Pega apenas o exterior do polígono
+            new_vertices = list(buffered.exterior.coords)[:-1]  # Remove o último ponto (duplicado)
+        else:
+            # Se o resultado for um MultiPolygon, pega o maior polígono
+            largest = max(buffered.geoms, key=lambda x: x.area)
+            new_vertices = list(largest.exterior.coords)[:-1]
+        
+        return new_vertices
+    
+    else:
+        return vertices
+
+def pre_processar_NFP(rotacoes, lista_pecas,offset):
     tabela_nfps = {}
-    i = 0
+    
+    # Calcula o total de iterações
+    total = len(lista_pecas) * len(rotacoes) * len(lista_pecas) * len(rotacoes)
+    atual = 0
+    
     for pecaA in lista_pecas:
-        i+=1
-        print(f"iteracao {i}")
         for grauA in rotacoes:
             for pecaB in lista_pecas:
                 for grauB in rotacoes:
+                    # Atualiza e mostra o progresso
+                    atual += 1
+                    porcentagem = (atual / total) * 100
+                    print(f"\rPré-processando NFPs: {porcentagem:.1f}% concluído", end="")
                     
-                    # Converta as peças para tuplas (se forem listas)
+                   
                     chave = (tuple(pecaA), grauA, tuple(pecaB), grauB)
-                    tabela_nfps[chave] = NFP(pecaA, grauA, pecaB, grauB)
+                    nfp = NFP(pecaA, grauA, pecaB, grauB)
+                 
+                    tabela_nfps[chave] = offset_polygon(nfp,offset)
+
+
     
+   
     return tabela_nfps
 
 
@@ -465,6 +442,9 @@ def ExSEARCH(ambiente, peca, grau_indice, draw,tabela_nfps):
     nfp = list(combinar_poligonos(nfps).exterior.coords)
 
     for x,y in nfp:
+                if draw:
+                        for i in range(20):
+                            ambiente.draw_click(x,-y,grau_indice,peca,flip)
                 pontos = [(int(x + rotate_point(cor[0], cor[1], grau)[0]), int(y + rotate_point(cor[0], cor[1], grau)[1])) for cor in pol_posicionar]       
         #for flip in [True, False]:
 
@@ -475,9 +455,7 @@ def ExSEARCH(ambiente, peca, grau_indice, draw,tabela_nfps):
                     if not ponto_dentro_poligono(x1,y1,ambiente.cordenadas_area, True):
                         posicao_valida = False
                 if posicao_valida:
-                    if draw:
-                        for i in range(10):
-                            ambiente.draw_click(x,-y,grau_indice,peca,flip)
+
                     pecas_posicionadas = copy.deepcopy(ambiente.pecas_posicionadas)
                     pecas_posicionadas.append(pontos)
 
@@ -490,12 +468,12 @@ def ExSEARCH(ambiente, peca, grau_indice, draw,tabela_nfps):
                     fecho_retangular_max = area_ocupada/area_FR
                     #fechoR = (1 - (area_ocupada/area_FR))
                     #nfp_meu = (fecho_convexo_max**10)*(area_FC/(ambiente.area))
-                    fecho = 'convexo'
+
                     pecas_posicionadas = []
-                    if fecho == "convexo":
-                        possiveis_posicoes.append([peca,x,y,grau_indice,flip,round(fecho_convexo_max,2),round(fecho_retangular_max,2),ambiente.lista[peca]])
-                    elif fecho == "retangular":
-                        possiveis_posicoes.append([peca,x,y,grau_indice,flip,round(fecho_retangular_max,2),round(fecho_convexo_max,2),ambiente.lista[peca]])
+                    #if fecho == "convexo":
+                    possiveis_posicoes.append([peca,x,y,grau_indice,flip,round(fecho_convexo_max,2),round(fecho_retangular_max,2),ambiente.lista[peca]])
+                    #elif fecho == "retangular":
+                    #possiveis_posicoes.append([peca,x,y,grau_indice,flip,round(fecho_retangular_max,2),round(fecho_convexo_max,2),ambiente.lista[peca]])
 
     if possiveis_posicoes:
         maior = float('-inf')
@@ -536,7 +514,7 @@ def NoFitPolygon(poligono_fixo, poligono_orbital):
     polyA = Polygon(poligono_fixo)
     polyB = Polygon(poligono_orbital)
 
-    return interpolar_pontos_poligono(no_fit_polygon(polyA, polyB), inter)
+    return interpolar_pontos_poligono(no_fit_polygon(polyA, polyB), 0)
 
 import random
 
@@ -657,14 +635,14 @@ def append_to_txt(data, filename):
     with open(filename, "a") as file:
         file.write(f"Iteracao {data['iteration']}: {data['num_pieces']} pecas, {data['area_percent']*100}% , {data['execution_time']:.2f} segundos\n")
 
-rotacoes = [0, 1, 2,3]
+rotacoes = [0, 1, 2]
 
-vizinhanca = 20
+vizinhanca = 30
 q1 = 50
 q2 = 20
 q3 = 30
 pecas_inisol = 0
-max_iter = 10
+max_iter = 30
 import time
 import math
 import turtle
@@ -689,160 +667,167 @@ def calcular_tempo_medio_desvio(tempos):
     
     return tempo_medio, desvio_padrao
 
-
-rotacoes = [0, 1, 2,3]
-
-import time
-import math
-import datetime
-
-
-def append_summary_to_txt(media, desvio_padrao, filename):
-    with open(filename, "a") as file:
-        file.write(f"\nTempo médio: {media:.2f} segundos\n")
-        file.write(f"Desvio padrão: {desvio_padrao:.2f} segundos\n")
-        file.write("---------------------------------------------------------------------------------------------\n")
-
-def calcular_tempo_medio_desvio(tempos):
-    # Calculando o tempo médio
-    tempo_medio = sum(tempos) / len(tempos)
-        
-    # Calculando o desvio padrão
-    soma_dos_quadrados = sum((x - tempo_medio) ** 2 for x in tempos)
-    desvio_padrao = math.sqrt(soma_dos_quadrados / len(tempos))
+def BRKGA(ambiente, rotacoes, pop_size, n_generations, tabela_nfps,base=None, altura=None,  suavizar = True, elite_pop = 0.2, chance_elite = 0.5):
+    print("\nBRKGA Iniciado!")
+    tam_elite = int(pop_size * elite_pop)
     
-    return tempo_medio, desvio_padrao
+    # População inicial
+    population = [np.random.random(len(ambiente.lista)) for _ in range(pop_size)]
+    best_solution = None
+    best_fitness = float('-inf')
 
-if __name__ == '__main__':
-    # Gerar um nome de arquivo com data e hora
-    current_time = datetime.datetime.now().strftime("%d-%m-%H_%M")
-    filename = f"/home/fsilvestre/Cutting_Stock_Problem/resultados_GRASP_GCG_{current_time}.txt"
-
-    #rotacoes = [0, 1, 2]
-    instancias = ['embraer_3365','embraer_610','embraer_778','embraer_863','embraer_1683','embraer_1893','embraer_2172','embraer_2338','embraer_3086','embraer_3089','embraer_3153','embraer_3274','embraer_3365']
-
-    vizinhancas = [50,30,10]
-    pesos = [[30,20,50]]#[70,20,10]]
-    interpolacoes = [0,1]
-    from datetime import datetime
-    global fecho
-    # Obter a data e hora atuais formatadas
-    data_hora = datetime.now().strftime("%d/%m/%Y %H:%M")
-    #inisols = [0,1,2]
-    with open(filename, "a") as file:
-        file.write("---------------------------------------------------------------------------------------------\n")
-        file.write(f"Data e Hora: {data_hora}\n")
-    fechos = ["convexo", "retangular"]
-    #fecho = "convexo"
-
-    global inter
-    inter = 0
-    for instancia in instancias:
-        if instancia == "fu":
-            rotacoes = [0, 1, 2]  # 0, 90, 180
-        elif instancia == "jackobs1":
-            rotacoes = [0, 1, 2]  # 0, 90, 180
-        elif instancia == "jackobs2":
-            rotacoes = [0, 1, 2]  # 0, 90, 180
-        elif instancia == "shapes0":
-            rotacoes = [0]  # Apenas 0
-        elif instancia == "shapes1":
-            rotacoes = [0, 2]  # 0, 180
-        elif instancia == "shapes2":
-            rotacoes = [0, 2]  # 0, 180
-        elif instancia == "dighe1":
-            rotacoes = [0]  # Apenas 0
-        elif instancia == "dighe2":
-            rotacoes = [0]  # Apenas 0
-        elif instancia == "albano":
-            rotacoes = [0, 2]  # 0, 180
-        elif instancia == "dagli":
-            rotacoes = [0]  # Apenas 0
-        elif instancia == "mao":
-            rotacoes = [0, 1, 2]  # 0, 90, 180
-        elif instancia == "marques":
-            rotacoes = [0, 1, 2]  # 0, 90, 180
-        else:
-            rotacoes = [0,1,2,3]
+    for generation in range(n_generations):
+        elite = []
+        fitness_elite = []
         
-        #fecho = 'convexo'
-        for intp in interpolacoes:
-                            inter = intp
-            #for vin in vizinhancas:
-                            for fecho1 in fechos:
-                                fecho = fecho1
-                    
-                    
-                    #for p in inisols:    
-                    #for inter in interpolacoes:
-                        #interpo = inter
-                        #for Q1,Q2,Q3 in pesos:
-                            #for vin in vizinhancas:   
-                                env = CSP(instancia,render=False,plot=False)
-                                Stime = time.time()
-                                tabela_nfps = pre_processar_NFP(rotacoes, env.nova_lista)
-                                Etime = time.time()
-                                with open(filename, "a") as file:
-                                    file.write("---------------------------------------------------------------------------------------------\n")
-                                    file.write(f"GRASP ORIGINAL {instancia}: pre processar nfp {round(Etime-Stime,1)}, iteracoes maxima {max_iter}, {vizinhanca} vizinhancas, q1,q2,q2 = {q1},{q2},{q3}, interpolacao = {inter}, fecho = {fecho}, pecas inisol = {env.max_pecas - int(round(len(env.lista)*0.0,0))}/{env.max_pecas}, rotacoes{rotacoes}\n")
-
-                                tempos = []
-
-                                for i in range(50):
-                                    dimensao = [558, 352]
-                                    start_time = time.time()  
-                                    pecas = GRASP(max_iter, vizinhanca, q1, q2, q3, rotacoes,int(round(len(env.lista)*0.0,0)),instancia, tabela_nfps,dimensao[0],dimensao[1])
-                                    
-                                    # Crie um novo ambiente para cada verificação
-                                    ambiente_verificacao = CSP(dataset=instancia, render=False, plot=False,
-                                                            Base=dimensao[0], Altura=dimensao[1])
-                                    x, y = ambiente_verificacao.cordenadas_area[3]
-                                    index = ambiente_verificacao.lista.index(pecas[0][-1])
-                                    ambiente_verificacao.acao(index, x, y, 0, False)
-                                    
-                                    for peca in pecas[1:]:
-                                        if peca[-1] in ambiente_verificacao.lista:
-                                            index = ambiente_verificacao.lista.index(peca[-1])
-                                            peca_posicao = PackS_G(ambiente_verificacao, index, rotacoes, False, tabela_nfps)
-                                            if peca_posicao is not False:
-                                                ambiente_verificacao.acao(peca_posicao[0], peca_posicao[1], 
-                                                                    peca_posicao[2], peca_posicao[3],
-                                                                    peca_posicao[4], True)
-                                            else:
-                                                print(ambiente_verificacao.lista[index])
-                                                print(peca[-1])
-                                    
-                                    print(len(ambiente_verificacao.pecas_posicionadas))
-                                    end_time = time.time()
-                                    execution_time = end_time - start_time
-
-                                    # Resto do código...
-                                    del ambiente_verificacao  # Explicitamente deletar o ambiente após o uso Calcula o tempo de execução
-                                    #env = CSP(instancia,render=False,plot=False)
-                                    #print(f"Iteracao {i+1}: {len(pecas)} pecas, {porcentagem_area(pecas,env)} , {execution_time:.2f} segundos")
-
-                                    resultado = {
-                                        "iteration": i + 1,
-                                        "num_pieces": len(pecas),
-                                        "area_percent": porcentagem_area(pecas,env) * 100,
-                                        "execution_time": execution_time,
-                                        "pieces": [pol[-1] for pol in pecas]
-                                    }
-                                    #print(resultado)
-                                    # Armazena o tempo de execução
-                                    tempos.append(execution_time)
-                                    
-                                    # Salvar os resultados em um arquivo .txt a cada iteração
-                                    append_to_txt(resultado, filename)
-
-                                # Calcula a média e o desvio padrão dos tempos
-                                media, desvio_padrao = calcular_tempo_medio_desvio(tempos)
-                                
-                                # Salvar a média e o desvio padrão no arquivo
-                                append_summary_to_txt(media, desvio_padrao, filename)
-
-    turtle.done()
-
-
         
+        # Avalia população
+        fitness_values = []
+        solutions = []
+        for keys in population:
+          
+
+            sequence = np.argsort(keys)  # Isso dá os índices ordenados
+           
+            pecas = []
+            for i in sequence[1:]:
+                pecas.append(ambiente.lista[i]) 
+
+            # Reinicia ambiente para nova solução
+            ambiente_temp = CSP(dataset=ambiente.pecas, render=False, plot=False,Base=base,Altura=altura, suavizar=suavizar)
+            I1 = []
             
+            # Posiciona primeira peça
+            x, y = ambiente_temp.cordenadas_area[3]
+            first_idx = sequence[0]  # Índice da primeira peça
+            
+            minx = min([x for x,y in ambiente_temp.nova_lista[first_idx]]) 
+            miny = min([y for x,y in ambiente_temp.nova_lista[first_idx]]) 
+            
+            # Adiciona primeira peça
+            peca1 = [first_idx, x - minx, y - miny, 0, 0, ambiente_temp.lista[first_idx]]
+            ambiente_temp.acao(first_idx, x - minx, y - miny, 0, False)
+            I1.append(peca1)
+            
+            # Para cada índice na sequência
+            for peca in pecas:
+                # Tenta posicionar a peça usando o índice correto
+                position = PackS(ambiente_temp, ambiente_temp.lista.index(peca), rotacoes, False, tabela_nfps)
+                
+                if position is not False:
+                    I1.append(position)
+                    ambiente_temp.acao(position[0], position[1], position[2], 
+                                     position[3], position[4], True)
+            
+            fitness = porcentagem_area(I1, ambiente_temp)
+            fitness_values.append(fitness)
+            solutions.append(I1)
+            if len(elite) < tam_elite:
+                i = 0
+                for value in fitness_elite:                    
+                    if fitness < value:
+                        break
+                    i+=1
+
+                elite.insert(i,keys)
+                fitness_elite.insert(i,fitness)
+            else:
+
+                    
+                if fitness > fitness_elite[0]: 
+                    elite.pop(0)
+                    fitness_elite.pop(0)
+
+                    i = 0
+                    for value in fitness_elite:                        
+                        if fitness < value:
+                            break
+                        i+=1
+
+                    elite.insert(i,keys)
+                    fitness_elite.insert(i,fitness)          
+            if fitness > best_fitness:
+
+                best_fitness = fitness
+                best_solution = copy.deepcopy(I1)
+                best_list = copy.deepcopy(ambiente_temp.lista)
+
+        parents_idx = np.argsort(fitness_values)[-pop_size//2:]
+        parents = [population[i] for i in parents_idx]
+        
+        # Gera nova população
+        new_population = [population[parents_idx[-1]]]  # mantém o melhor
+        
+        while len(new_population) < pop_size:
+            # Seleciona pais
+            print(len(parents))
+            print(len(elite))
+            parent1 = random.sample(parents, 1)[0]
+            parent2 = random.sample(elite, 1)[0]
+            
+            # Crossover
+            child = np.zeros(len(ambiente.lista))
+            for i in range(len(child)):
+                if random.random() < chance_elite:
+                    child[i] = parent2[i]
+                else:
+                    child[i] = parent1[i]
+            
+            # Mutação
+            if random.random() < 0.1:
+                idx = random.randint(0, len(child)-1)
+                child[idx] = random.random()
+            
+            new_population.append(child)
+        
+        population = new_population
+        print(f"Geração {generation + 1}: Melhor fitness = {best_fitness}, Pecas:{len(best_solution)}/{ambiente_temp.max_pecas}")
+        if len(best_solution) == ambiente_temp.max_pecas:
+            print("Solução ótima encontrada!")
+            break
+    
+    return best_solution, best_list
+
+
+# Uso:
+if __name__ == '__main__':
+    instancias = ['embraer_3365','dighe1','dighe2','fu','jackobs2','jackobs1','fu','shapes0','shapes1','shapes2','albano','dagli','mao','marques']
+
+    for instancia in instancias:
+
+        rotacoes = [0,1,2,3]
+        ambiente = CSP(dataset=instancia, render=False, plot=False)
+        
+        # Pré-processa NFPs
+        tabela_nfps = pre_processar_NFP(rotacoes, ambiente.nova_lista, 5)
+        start_time = time.time()
+        # Executa o algoritmo
+        print("Comecou")
+        solucao = BRKGA(
+            ambiente=ambiente,
+            rotacoes=rotacoes,
+            pop_size=50,
+            n_generations=30,
+            tabela_nfps=tabela_nfps
+        )
+          # Inicia a medição do 
+        end_time = time.time()  # Termina a medição do tempo
+        execution_time = end_time - start_time 
+        
+        # Visualiza resultado
+        if ambiente.render:
+            ambiente = CSP(dataset=instancia, render=True, plot=True)
+            x, y = ambiente.cordenadas_area[3]
+            
+            # Posiciona primeira peça
+            index = ambiente.lista.index(solucao[0][-1])
+            ambiente.acao(index, x, y, 0, False)
+            
+            # Posiciona demais peças
+            for peca in solucao[1:]:
+                if peca[-1] in ambiente.lista:
+                    index = ambiente.lista.index(peca[-1])
+                    ambiente.acao(peca[0], peca[1], peca[2], peca[3], peca[4], True)
+        
+        print(f"Fecho {ambiente.fecho}, Tempo {execution_time}")
+        turtle.done()

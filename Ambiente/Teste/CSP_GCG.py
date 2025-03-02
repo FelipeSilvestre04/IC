@@ -1,11 +1,19 @@
+import sys
+import os
+
+# Adiciona o diretório raiz do projeto ao sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')))
+
 import numpy as np
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
-from geradores import Area
 import turtle
 import math
-from botao import Botao
 from scipy.spatial import ConvexHull
+
+# Ajuste o caminho de importação para o módulo Botao
+from Cutting_Stock_Problem.Ambiente.Main.botao import Botao
+
 #import pyautogui
 
 class CSP():

@@ -12,8 +12,8 @@ import copy
 import random
 from scipy.spatial import ConvexHull
 
-def GCG(tabela_nfps, peças='fu',draw=False,escala=None,plot=False,render=False, pesos = [2,2,1], base=None, altura=None, margem = 0, suavizar = True):
-    print('\nGCG iniciado!')
+def GreedyInisol(tabela_nfps, peças='fu',draw=False,escala=None,plot=False,render=False, pesos = [2,2,1], base=None, altura=None, margem = 0, suavizar = True):
+    print('\nGreedyInisol iniciado!')
     ambiente = CSP(peças,render=render,plot=plot,Base=base,Altura=altura, suavizar=suavizar)
     if margem > 0:
         margem_segurança = 1.01
@@ -26,37 +26,28 @@ def GCG(tabela_nfps, peças='fu',draw=False,escala=None,plot=False,render=False,
     Indices = []
     i = 0
     k = 0
-    while Colunas_Possivel:
-        if i == 0:
-            k =0
-        else:
-            k = 5
-        i+=1
-        #print(f'Iteracao {i}')
-        print(f'Analisando possivel coluna {i}.')
-        col,fecho,res = gerar_coluna(tabela_nfps,ambiente,inicio_coluna ,pesos)
 
-        
+    col,fecho,res = gerar_coluna(tabela_nfps,ambiente,inicio_coluna ,pesos)
 
-        if res is not None:
-            inicio_coluna+=res
-            for pol in col:
-                
-                    ambiente.acao(ambiente.lista.index(pol[-1]),pol[0],pol[1],pol[2],False,True)
+    
 
-            for peca in ambiente.pecas_posicionadas:
-                Solucao.append(peca)
+    if res is not None:
+        inicio_coluna+=res
+        for pol in col:
+            
+                ambiente.acao(ambiente.lista.index(pol[-1]),pol[0],pol[1],pol[2],False,True)
 
-            for idx in ambiente.indices_pecas_posicionadas:
-                Indices.append(idx)
-            ambiente.pecas_posicionadas.clear()
-            ambiente.indices_pecas_posicionadas.clear()
+        for peca in ambiente.pecas_posicionadas:
+            Solucao.append(peca)
+
+        for idx in ambiente.indices_pecas_posicionadas:
+            Indices.append(idx)
+        ambiente.pecas_posicionadas.clear()
+        ambiente.indices_pecas_posicionadas.clear()
 
 
 
-        else:
-            Colunas_Possivel = False
-            break
+
     ambiente.pecas_posicionadas = Solucao
     ambiente.indices_pecas_posicionadas = Indices
     ambiente.atualizar_dados()
@@ -73,6 +64,7 @@ def GCG(tabela_nfps, peças='fu',draw=False,escala=None,plot=False,render=False,
     return ambiente.pecas_posicionadas,ambiente.area_ocupada/ambiente.area, ambiente.lista
 
 def gerar_coluna(tabela_nfps,ambiente,inicio_culuna,pesos):
+    largura_coluna = ambiente.base
     x, y = ambiente.cordenadas_area[3]
     grau = 0
     graus = [0,90,180,270]
@@ -105,7 +97,7 @@ def gerar_coluna(tabela_nfps,ambiente,inicio_culuna,pesos):
                 continue
     
 
-            largura_coluna = maxx - minx
+            
 
             melhor_peca = []
             while melhor_peca is not None:
@@ -564,59 +556,7 @@ def calcular_tempo_medio_desvio(tempos):
     desvio_padrao = math.sqrt(soma_dos_quadrados / len(tempos))
     
     return tempo_medio, desvio_padrao
-if __name__ == '__main__':
-    # Gerar um nome de arquivo com data e hora
-    current_time = datetime.datetime.now().strftime("%d-%m-%H_%M")
-    filename = f"/home/fsilvestre/Cutting_Stock_Problem/resultados_GCG.txt"
 
-    rotacoes = [0, 1, 2,3]
-    instancias = ['embraer_459','embraer_610','embraer_778','embraer_863','embraer_1683','embraer_1893','embraer_2172','embraer_2338','embraer_3086','embraer_3089','embraer_3153','embraer_3274','embraer_3365']
-    pesos = [[2,2,1]]
-    global inter
-    inter = 0
-    margem = 1
-    for e in [0.5, 1, 1.2, 1.5, 2]:
-        for instancia in reversed(instancias):
-            env = CSP(instancia, plot=False,render=False)
-            Stime = time.time()
-            tabela_nfps = pre_processar_NFP(rotacoes, env.nova_lista,margem)
-            Etime = time.time()    
-        
-            with open(filename, "a") as file:
-                file.write("---------------------------------------------------------------------------------------------\n")
-                file.write(f"GCG ORIGINAL {instancia}, pre_computar nfp = {round(Etime - Stime,1)} epslon = {e}, interpolacao - {inter}\n")
-
-            tempos = []
-            i =1
-            for i in range(1):
-                start_time = time.time()  # Inicia a medição do tempo
-                pecas,area = GCG(tabela_nfps, instancia,plot=False,render=False)
-                print(pecas)
-                end_time = time.time()  # Termina a medição do tempo
-                execution_time = end_time - start_time  # Calcula o tempo de execução
-                print(f"Iteracao {i + 1}: {len(pecas)} pecas, {round(area*100,2)}% , {execution_time:.2f} segundos")
-
-                resultado = {
-                    "iteration": i + 1,
-                    "num_pieces": len(pecas),
-                    "area_percent": round(area*100, 2),
-                    "execution_time": execution_time,
-                    "pieces":pecas
-                }
-                #print(resultado)
-                # Armazena o tempo de execução
-                tempos.append(execution_time)
-                
-                # Salvar os resultados em um arquivo .txt a cada iteração
-                append_to_txt(resultado, filename)
-
-            # Calcula a média e o desvio padrão dos tempos
-            media, desvio_padrao = calcular_tempo_medio_desvio(tempos)
-            
-            # Salvar a média e o desvio padrão no arquivo
-            append_summary_to_txt(media, desvio_padrao, filename)
-
-    turtle.done()
         
 
         

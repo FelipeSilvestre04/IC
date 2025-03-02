@@ -1,10 +1,15 @@
-import numpy as np
+import sys
+import os
 
+
+
+import numpy as np
 from shapely.geometry import Polygon, MultiPoint
 from shapely.ops import unary_union, triangulate
 import turtle
 
-from CSP_GCG import ponto_dentro_poligono,tratar_lista, CSP
+# Ajuste o caminho de importação para o módulo CSP_GCG
+from Cutting_Stock_Problem.Ambiente.Teste.CSP_GCG import ponto_dentro_poligono, tratar_lista, CSP
 
 import math
 from shapely.geometry import MultiPoint, Polygon, MultiPolygon
@@ -190,7 +195,7 @@ def interpolar_pontos_poligono(vertices, pontos_entre_vertices=0):
     
     return pontos_finais
 
-from Corte_e_Empacomento_PC_flip import ler_poligonos
+from Cutting_Stock_Problem.Ambiente.Teste.Corte_e_Empacomento_PC_flip import ler_poligonos
 def desenhar(cords, x_offset, y_offset,color, fill = False, draw = False):
         if not draw:
             p = turtle.Turtle()

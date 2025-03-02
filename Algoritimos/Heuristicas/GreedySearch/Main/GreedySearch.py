@@ -12,8 +12,8 @@ import copy
 import random
 from scipy.spatial import ConvexHull
 
-def GCG(tabela_nfps, peças='fu',draw=False,escala=None,plot=False,render=False, pesos = [2,2,1], base=None, altura=None, margem = 0, suavizar = True):
-    print('\nGCG iniciado!')
+def GreedySearch(tabela_nfps, peças='fu',draw=False,escala=None,plot=False,render=False, pesos = [2,2,1], base=None, altura=None, margem = 0, suavizar = True):
+    print('\nGreedySearch iniciado!')
     ambiente = CSP(peças,render=render,plot=plot,Base=base,Altura=altura, suavizar=suavizar)
     if margem > 0:
         margem_segurança = 1.01
@@ -26,49 +26,82 @@ def GCG(tabela_nfps, peças='fu',draw=False,escala=None,plot=False,render=False,
     Indices = []
     i = 0
     k = 0
-    while Colunas_Possivel:
-        if i == 0:
-            k =0
+    
+    graus = [0,90,180,270]
+    x, y = ambiente.cordenadas_area[3]
+    possiveis_solucoes = []
+    for g in range(3):
+        solucao = []
+        peca = max(ambiente.lista, key=lambda x: calcular_area(x))
+        i = ambiente.lista.index(peca)
+        peca_rot = [(round(rotate_point(cor[0], cor[1], graus[g])[0],0), round(rotate_point(cor[0], cor[1], graus[g])[1],0)) for cor in peca]
+        
+        minx = min([x for x,y in peca_rot]) 
+        miny = min([y for x,y in peca_rot]) 
+
+        maxx = max([x for x,y in peca_rot])
+
+        minx*=ambiente.Escala
+        miny*=ambiente.Escala
+        maxx*=ambiente.Escala
+
+        peca1 = [x  - minx,y - miny, g ,ambiente.lista[i]]
+        
+        tam = len(ambiente.lista)
+        ambiente.acao(i, x  - minx, y - miny, g, False)
+        
+        if tam > len(ambiente.lista):
+            solucao.append(copy.deepcopy(peca1))
         else:
-            k = 5
-        i+=1
-        #print(f'Iteracao {i}')
-        print(f'Analisando possivel coluna {i}.')
-        col,fecho,res = gerar_coluna(tabela_nfps,ambiente,inicio_coluna ,pesos)
+            print("peca nao posicionada", g)
+            
+            
+            continue
+
+
 
         
 
-        if res is not None:
-            inicio_coluna+=res
-            for pol in col:
-                
-                    ambiente.acao(ambiente.lista.index(pol[-1]),pol[0],pol[1],pol[2],False,True)
-
-            for peca in ambiente.pecas_posicionadas:
-                Solucao.append(peca)
-
-            for idx in ambiente.indices_pecas_posicionadas:
-                Indices.append(idx)
-            ambiente.pecas_posicionadas.clear()
-            ambiente.indices_pecas_posicionadas.clear()
-
-
-
-        else:
-            Colunas_Possivel = False
-            break
-    ambiente.pecas_posicionadas = Solucao
-    ambiente.indices_pecas_posicionadas = Indices
-    ambiente.atualizar_dados()
-
-    if ambiente.lista:
         melhor_peca = []
         while melhor_peca is not None:
-            melhor_peca = varredura(tabela_nfps,ambiente,0,ambiente.base,False,False)
-            if melhor_peca is not None:
-                ambiente.acao(ambiente.lista.index(melhor_peca[-1]), melhor_peca[0], melhor_peca[1], melhor_peca[2],False, True)
-            else:
+            melhor_peca = varredura(tabela_nfps,ambiente,0,ambiente.base)
+            tamanh = len(ambiente.lista)
+            
+
+            if melhor_peca is None:
                 break
+            else:
+                ambiente.acao(ambiente.lista.index(melhor_peca[-1]), melhor_peca[0], melhor_peca[1], melhor_peca[2],False, True)
+                solucao.append(copy.deepcopy(melhor_peca))
+        
+        possiveis_solucoes.append(copy.deepcopy(solucao))       
+        print(len(ambiente.pecas_posicionadas))
+        ambiente = CSP(peças,render=render,plot=plot,Base=base,Altura=altura, suavizar=suavizar)
+        print(len(ambiente.pecas_posicionadas))
+        
+   
+
+    print(len(possiveis_solucoes))
+    melhor_solucao = None
+    melhor_preenchimento = 0
+    for solucao in possiveis_solucoes:
+        for pol in solucao:
+            
+                ambiente.acao(ambiente.lista.index(pol[-1]),pol[0],pol[1],pol[2],False,True)
+                print(len(ambiente.pecas_posicionadas))
+
+        if ambiente.area_ocupada/ambiente.area > melhor_preenchimento:
+            print(len(ambiente.pecas_posicionadas))
+            melhor_preenchimento = ambiente.area_ocupada/ambiente.area
+            melhor_solucao = copy.deepcopy(solucao)
+            
+        ambiente = CSP(peças,render=render,plot=plot,Base=base,Altura=altura, suavizar=suavizar)
+
+
+
+
+    for pol in melhor_solucao:
+        ambiente.acao(ambiente.lista.index(pol[-1]),pol[0],pol[1],pol[2],False,True)
 
     return ambiente.pecas_posicionadas,ambiente.area_ocupada/ambiente.area, ambiente.lista
 
@@ -242,17 +275,18 @@ def varredura(tabela_nfps,ambiente,inicio_coluna,largura_coluna,draw = False, ma
                 
                 nfps = []
                 for x2, y2, rot, pol in ambiente.indices_pecas_posicionadas:
+                    
                     # Converta as peças para tuplas ao acessar a tabela
                     chave = (tuple(ambiente.nova_lista_original[pol]), rot, 
                             tuple(pol_posicionar), graus.index(grau))
                     
                     # Acesse o NFP com a chave correta
-                    nfp1 = [(x1 + x2, y1 + y2) for x1, y1 in tabela_nfps[chave]]
+                    nfp1 = [(int(x1) + int(x2), int(y1) + int(y2)) for x1, y1 in tabela_nfps[chave]]
                     #print(x2,y2)
                     # Adicione o polígono ao resultado
                     nfps.append(Polygon(copy.deepcopy(nfp1)))
 
-                # Combine os polígonos
+   
                 nfp = list(combinar_poligonos(nfps).exterior.coords)
                 #print(Polygon(nfp).geom_type, Polygon(nfp).is_valid)
                 #print(grau)
@@ -564,59 +598,7 @@ def calcular_tempo_medio_desvio(tempos):
     desvio_padrao = math.sqrt(soma_dos_quadrados / len(tempos))
     
     return tempo_medio, desvio_padrao
-if __name__ == '__main__':
-    # Gerar um nome de arquivo com data e hora
-    current_time = datetime.datetime.now().strftime("%d-%m-%H_%M")
-    filename = f"/home/fsilvestre/Cutting_Stock_Problem/resultados_GCG.txt"
 
-    rotacoes = [0, 1, 2,3]
-    instancias = ['embraer_459','embraer_610','embraer_778','embraer_863','embraer_1683','embraer_1893','embraer_2172','embraer_2338','embraer_3086','embraer_3089','embraer_3153','embraer_3274','embraer_3365']
-    pesos = [[2,2,1]]
-    global inter
-    inter = 0
-    margem = 1
-    for e in [0.5, 1, 1.2, 1.5, 2]:
-        for instancia in reversed(instancias):
-            env = CSP(instancia, plot=False,render=False)
-            Stime = time.time()
-            tabela_nfps = pre_processar_NFP(rotacoes, env.nova_lista,margem)
-            Etime = time.time()    
-        
-            with open(filename, "a") as file:
-                file.write("---------------------------------------------------------------------------------------------\n")
-                file.write(f"GCG ORIGINAL {instancia}, pre_computar nfp = {round(Etime - Stime,1)} epslon = {e}, interpolacao - {inter}\n")
-
-            tempos = []
-            i =1
-            for i in range(1):
-                start_time = time.time()  # Inicia a medição do tempo
-                pecas,area = GCG(tabela_nfps, instancia,plot=False,render=False)
-                print(pecas)
-                end_time = time.time()  # Termina a medição do tempo
-                execution_time = end_time - start_time  # Calcula o tempo de execução
-                print(f"Iteracao {i + 1}: {len(pecas)} pecas, {round(area*100,2)}% , {execution_time:.2f} segundos")
-
-                resultado = {
-                    "iteration": i + 1,
-                    "num_pieces": len(pecas),
-                    "area_percent": round(area*100, 2),
-                    "execution_time": execution_time,
-                    "pieces":pecas
-                }
-                #print(resultado)
-                # Armazena o tempo de execução
-                tempos.append(execution_time)
-                
-                # Salvar os resultados em um arquivo .txt a cada iteração
-                append_to_txt(resultado, filename)
-
-            # Calcula a média e o desvio padrão dos tempos
-            media, desvio_padrao = calcular_tempo_medio_desvio(tempos)
-            
-            # Salvar a média e o desvio padrão no arquivo
-            append_summary_to_txt(media, desvio_padrao, filename)
-
-    turtle.done()
         
 
         

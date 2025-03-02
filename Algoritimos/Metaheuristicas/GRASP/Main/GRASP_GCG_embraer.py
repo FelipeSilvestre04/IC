@@ -1,14 +1,17 @@
+import sys
+import os
+
+# Adiciona o diretório raiz do projeto ao sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')))
+
 from Cutting_Stock_Problem.Ambiente.Main.CSP_embraer import CSP
 from Cutting_Stock_Problem.Ambiente.Main.CSP_embraer import calcular_area, rotate_point, ponto_dentro_poligono
-from nfp_teste import combinar_poligonos,triangulate_shapely
-from nfp_teste import no_fit_polygon
-from Random_Key_embraer import pre_processar_NFP
+from Cutting_Stock_Problem.Ambiente.Teste.nfp_teste import combinar_poligonos, triangulate_shapely, no_fit_polygon
+from Cutting_Stock_Problem.Algoritimos.Metaheuristicas.RKGA.Main.RKGA import pre_processar_NFP
 import numpy as np
 from shapely.geometry import Polygon, MultiPoint
 import turtle
-import numpy as np
 import random
-import turtle
 import copy
 from numba import njit
 
@@ -243,7 +246,7 @@ def indices_sem_copias(lista):
 def IniSOL(ambiente, rotacoes, pq,draw, tabela_nfps,Base,Altura):
     I1 = []  # Peças posicionadas
     I2 = []  # Peças não posicionadas
-
+    pecas_aleatorias = math.ceil(len(ambiente.lista) * 0.1) - 1
     indexs_1 = [i for i in range(len(ambiente.lista))]
     print(indexs_1)
     colocou = False
@@ -312,7 +315,14 @@ def IniSOL(ambiente, rotacoes, pq,draw, tabela_nfps,Base,Altura):
         # Se houver posições possíveis para a peça, escolha a melhor
         if Possiveis_posicoes:
             
-            max_valor = best_posicao(Possiveis_posicoes)[5]
+            if pecas_aleatorias == 0:
+                max_valor = best_posicao(Possiveis_posicoes)[5]
+            else:
+                if random.random() < 0.5:
+                    max_valor = random.sample(Possiveis_posicoes, k=1)[0][5]
+                    pecas_aleatorias -= 1
+                else:
+                    max_valor = best_posicao(Possiveis_posicoes)[5]
             melhores_posicoes = [p for p in Possiveis_posicoes if p[5] == max_valor]
 
             melhor_posicao = max(melhores_posicoes, key=lambda p: calcular_area(ambiente.lista[p[0]]))

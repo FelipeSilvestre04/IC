@@ -1,8 +1,7 @@
 import sys
 import os
 
-# Adiciona o diretório raiz do projeto ao sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath("/home/fsilvestre"))
 
 
 
@@ -11,14 +10,38 @@ from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 import turtle
 import math
-from botao import Botao
+from Cutting_Stock_Problem.Ambiente.Main.botao import Botao
+from Cutting_Stock_Problem.Ambiente.Teste.nfp_teste import combinar_poligonos, triangulate_shapely,NoFitPolygon
+
 from scipy.spatial import ConvexHull
 import numpy as np
 import cv2
 import copy
 
+def NFP(PecaA,grauA,PecaB,grauB):
+    graus = [0,90,180,270]
+    grauA = graus[grauA]
+    grauB = graus[grauB]
+    pontos_pol_A = [(int(rotate_point(cor[0], cor[1], grauA)[0]), int(rotate_point(cor[0], cor[1], grauA)[1])) for cor in PecaA]
+    pontos_pol_B = [(int(rotate_point(cor[0], cor[1], grauB)[0]), int(rotate_point(cor[0], cor[1], grauB)[1])) for cor in PecaB]
+    nfps_CB_CA = []
+    convex_partsB = triangulate_shapely(pontos_pol_B)
+    
+    convex_partsA = triangulate_shapely(pontos_pol_A)
+
+    nfps_convx = []
+    for CB in convex_partsB:
+        for convex in convex_partsA:
+            nfps_convx.append(Polygon(NoFitPolygon(convex, CB)))
+
+
+    nfp_final = list(combinar_poligonos(nfps_convx).exterior.coords)
+    #print(nfp_final)
+
+    return nfp_final
+
 class CSP():
-    def __init__(self,dataset='fu',Base=None,Altura=None,Escala=None,render=False,plot=True, x=-200, y=200, suavizar = True):
+    def __init__(self,dataset='fu',Base=None,Altura=None,Escala=None,render=False,plot=True, x=-200, y=200, suavizar = True, pre_processar = None, margem = 5, ajuste = False):
         
         self.x = x
         self.y = y
@@ -27,6 +50,8 @@ class CSP():
         self.plot = plot
         
         self.pecas = dataset
+        self.rotacoes = [0, 1, 2, 3]
+
         if Base == None and Altura == None:
             self.instancias()
         else:
@@ -42,50 +67,40 @@ class CSP():
         area_minima = 50  # Área mínima para considerar o polígono válido
         epsilon = 1  # Parâmetro de suavização para simplificação de vértices
 
-        if suavizar:
-            self.lista_original = ler_poligonos('/home/fsilvestre/Cutting_Stock_Problem/' + self.pecas +'.dat')
-        else:
+
+        lista = []
+        try:
+            self.lista_original = ler_poligonos('/home/fsilvestre/Cutting_Stock_Problem/Datasets/' + self.pecas +'.dat')
+        except FileNotFoundError:
             self.lista_original = ler_poligonos(self.pecas)
         
-        lista = []
-        for index in range(len(self.lista_original)):
-            if suavizar:
-                novos_poligonos = suavizar_poligono(index, self.lista_original, iteracoes, tamanho_kernel, area_minima, epsilon)
-                lista.append(novos_poligonos[0])
-            else:
-                lista = self.lista_original
-                break
+        if suavizar:
+            lista = [suavizar_poligono(idx, self.lista_original, iteracoes, tamanho_kernel, area_minima, epsilon) for idx in range(len(self.lista_original))]
+        else:
+            lista = self.lista_original
+        
+
         
         self.lista_original = copy.deepcopy(lista)
-        #self.lista_original = [ajustar_poligono(pol) for pol in self.lista_original]
-
         self.nova_lista_original, self.nova_lista_completa_original = tratar_lista(self.lista_original, self.Escala)
-        #self.nova_lista_original = [ajustar_poligono(pol) for pol in self.nova_lista_original]
-        #self.nova_lista_completa_original = [ajustar_poligono(pol) for pol in self.nova_lista_completa_original]
+        
+        if ajuste:
+            self.lista_original = [ajustar_poligono(pol) for pol in self.lista_original]
+            self.nova_lista_original = [ajustar_poligono(pol) for pol in self.nova_lista_original]
+            self.nova_lista_completa_original = [ajustar_poligono(pol) for pol in self.nova_lista_completa_original]
 
         self.max_pecas = len(self.lista_original)
         
-        if suavizar:
-            self.lista = ler_poligonos('/home/fsilvestre/Cutting_Stock_Problem/' + self.pecas +'.dat')
+
+        
+        self.lista, self.nova_lista, self.nova_lista_completa = copy.deepcopy(self.lista_original), copy.deepcopy(self.nova_lista_original), copy.deepcopy(self.nova_lista_completa_original)
+        
+        if pre_processar is None:
+            self.tabela_nfps = pre_processar_NFP(self.rotacoes, self.nova_lista, margem)
+
         else:
-            self.lista = ler_poligonos(self.pecas)
-        lista = []
-        for index in range(len(self.lista)):
-            if suavizar:
-                novos_poligonos = suavizar_poligono(index, self.lista, iteracoes, tamanho_kernel, area_minima, epsilon)
-                lista.append(novos_poligonos[0])
-            else:
-                lista = self.lista_original
-                break
-        
-        self.lista = copy.deepcopy(lista)
-        #self.lista = [ajustar_poligono(pol) for pol in self.lista]
+            self.tabela_nfps = pre_processar
 
-        self.nova_lista, self.nova_lista_completa = tratar_lista(self.lista, self.Escala)
-        
-
-        #self.nova_lista = [ajustar_poligono(pol) for pol in self.nova_lista]
-        #self.nova_lista_completa = [ajustar_poligono(pol) for pol in self.nova_lista_completa]
 
         self.pecas_posicionadas = []
         self.indices_pecas_posicionadas = []
@@ -101,6 +116,8 @@ class CSP():
         if self.render:
             turtle.tracer(0)
             self.botao_remover = Botao(self.x + 350, self.y + 300, 200, 150)
+            self.botao_reset = Botao(self.x + 100, self.y + 300, 200, 150)
+
             self.turtle_fecho = turtle.Turtle()
             self.turtle_dados = turtle.Turtle()
             self.lista_turtle = []
@@ -110,7 +127,7 @@ class CSP():
         self.fecho = 0
         self.vertices_fecho = []
             
-    def acao(self,peca,x,y,grau_indice,flip,verificado=False):
+    def acao(self,peca,x,y,grau_indice,flip = False,verificado=False):
         if peca < len(self.lista):
             if not verificado: 
                 #print("Nao Verificado")       
@@ -125,7 +142,7 @@ class CSP():
                 pontos_verificacao = [(int(x) + int(rotate_point(cor[0], cor[1], grau)[0]), int(y) + int(rotate_point(cor[0], cor[1], grau)[1])) for cor in pol_verificacao]
                 pontos_posicionar = [(int(x) + int(rotate_point(cor[0], cor[1], grau)[0]), int(y) + int(rotate_point(cor[0], cor[1], grau)[1])) for cor in pol_posicionar]
                 
-                if self.posicao_disponivel(pontos_verificacao):
+                if self.posicao_disponivel(peca,grau_indice,x,y,pontos_verificacao):
                     self.indices_pecas_posicionadas.append([x,y,grau_indice,self.nova_lista_original.index(pol_posicionar)])
                     self.pecas_posicionadas.append(pontos_posicionar)
                     if self.render:
@@ -163,6 +180,27 @@ class CSP():
             print("Error")
             return False
      
+    def nfp(self, peca, grau_indice):
+        nfps = []
+        for x2, y2, grau1, pol in self.indices_pecas_posicionadas:
+        # Converta as peças para tuplas ao acessar a tabela
+            chave = (tuple(self.nova_lista_original[pol]), grau1, 
+                    tuple(self.nova_lista[peca]), grau_indice)
+        
+        # Acesse o NFP com a chave correta
+            nfp1 = [(x1 + x2, y1 + y2) for x1, y1 in self.tabela_nfps[chave]]
+            #print(x2,y2)
+            # Adicione o polígono ao resultado
+            nfps.append(Polygon(copy.deepcopy(nfp1)))
+
+    # Combine os polígonos
+        nfp = list(combinar_poligonos(nfps).exterior.coords)
+
+        return nfp
+
+    def resetar(self):
+        for i in range(len(self.pecas_posicionadas)):
+            self.remover_da_area()
 
     def atualizar_dados(self):
         self.area_ocupada = sum([calcular_area(pol) for pol in self.pecas_posicionadas])
@@ -269,30 +307,21 @@ class CSP():
         # Reorganizando self.nova_lista_completa com base em self.nova_lista_completa_original
         self.nova_lista_completa = restaurar_lista(self.nova_lista_completa_original, self.nova_lista_completa)
       
-    def posicao_disponivel(self,pontos_pol):
-
-        pontos = pontos_no_poligono(pontos_pol)
-
-        if any(self.CordenadaProibida(px, py) for px, py in pontos):
-            #print(1)
-            return False
+    def posicao_disponivel(self,peca,grau,x,y, pontos_verificação):
         
-        if any(self.CordenadaProibida(px, py) for px, py in pontos_pol):
-            #print(2)
-            return False
-
-        if any(any(ponto_dentro_poligono(cor[0], cor[1], pontos_pol, False) for cor in pol) for pol in self.pecas_posicionadas):
-            #print(3)
-            return False
+        Dentro = True
+        for x1,y1 in pontos_verificação:
+            if not ponto_dentro_poligono(x1,y1,self.cordenadas_area, True):
+                Dentro = False
         
-        #for pol in self.pecas_posicionadas:
-            #p = pontos_no_poligono(pol)
-            #for x,y in p:
-                #if ponto_dentro_poligono(x,y,pontos_pol, False):
-                    #print(1)
-                    #return False        
-        
-        return True
+        if len(self.pecas_posicionadas) == 0:
+            return Dentro
+        else:
+            nfp = self.nfp(peca, grau)
+            if ponto_dentro_poligono(x,y,nfp,True):
+                return False
+            else:
+                return Dentro
   
     def renderizar(self):
         turtle.tracer(0)
@@ -451,6 +480,10 @@ class CSP():
                 self.n = 0
                 self.remover_da_area()
                 return
+            if self.botao_reset.clicou(x,y):
+                self.n = 0
+                self.resetar()
+                return
         
         numero_pecas = len(self.lista)
         self.acao(self.n,x,y,self.g, False)
@@ -466,7 +499,8 @@ class CSP():
             turtle.onscreenclick(self.mais_g,3)
             turtle.onscreenclick(self.mais_n,2)
             turtle.onscreenclick(self.on_click)
-           
+
+            # x1,y1 = pyautogui.position()
             x1 = 963
             y1 = 533
              
@@ -476,6 +510,77 @@ class CSP():
                 self.loop = False
                 turtle.clear()
                 break
+
+
+def offset_polygon(vertices, offset):
+    """
+    Cria um novo polígono com offset a partir de um polígono original usando Shapely
+    
+    Args:
+        vertices: Lista de tuplas (x, y) representando os vértices do polígono
+        offset: Valor do offset (positivo para expandir, negativo para contrair)
+    
+    Returns:
+        Lista de tuplas (x, y) representando os vértices do novo polígono
+    """
+    if offset > 0:
+        # Cria um polígono Shapely
+        poly = Polygon(vertices)
+        
+        # Verifica se o polígono é válido
+        if not poly.is_valid:
+            return vertices
+        
+        # Aplica o buffer (offset)
+        # join_style=1 (round) para suavizar cantos
+        # mitre_limit controla quanto os cantos podem se estender
+        buffered = poly.buffer(offset, join_style=1, mitre_limit=2.0)
+        
+        # Se o resultado for vazio ou inválido, retorna o original
+        if buffered.is_empty or not buffered.is_valid:
+            return vertices
+        
+        # Extrai os vértices do polígono resultante
+        if buffered.geom_type == 'Polygon':
+            # Pega apenas o exterior do polígono
+            new_vertices = list(buffered.exterior.coords)[:-1]  # Remove o último ponto (duplicado)
+        else:
+            # Se o resultado for um MultiPolygon, pega o maior polígono
+            largest = max(buffered.geoms, key=lambda x: x.area)
+            new_vertices = list(largest.exterior.coords)[:-1]
+        
+        return new_vertices
+    
+    else:
+        return vertices
+
+def pre_processar_NFP(rotacoes, lista_pecas,offset):
+    tabela_nfps = {}
+    
+    # Calcula o total de iterações
+    total = len(lista_pecas) * len(rotacoes) * len(lista_pecas) * len(rotacoes)
+    atual = 0
+    
+    for pecaA in lista_pecas:
+        for grauA in rotacoes:
+            for pecaB in lista_pecas:
+                for grauB in rotacoes:
+                    # Atualiza e mostra o progresso
+                    atual += 1
+                    porcentagem = (atual / total) * 100
+                    print(f"\rPré-processando NFPs: {porcentagem:.1f}% concluído", end="")
+                    
+                   
+                    chave = (tuple(pecaA), grauA, tuple(pecaB), grauB)
+                    nfp = NFP(pecaA, grauA, pecaB, grauB)
+                 
+                    tabela_nfps[chave] = offset_polygon(nfp,offset)
+
+
+    
+   
+    return tabela_nfps
+
 
 def flip_polygon(polygon, axis='y'):
     """
